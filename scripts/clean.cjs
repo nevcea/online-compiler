@@ -13,7 +13,7 @@ function runScript(scriptName) {
     const scriptPath = path.join(__dirname, `${scriptName}${scriptExt}`);
 
     if (!fs.existsSync(scriptPath)) {
-        console.error(`❌ Script not found: ${scriptPath}`);
+        console.error(`[ERROR] Script not found: ${scriptPath}`);
         process.exit(1);
     }
 
@@ -30,7 +30,7 @@ function runScript(scriptName) {
             });
         }
     } catch (error) {
-        console.error(`❌ Error running script: ${error.message}`);
+        console.error(`[ERROR] Error running script: ${error.message}`);
         process.exit(1);
     }
 }

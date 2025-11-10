@@ -4,21 +4,21 @@
 
 set -e
 
-echo "🧪 Running tests..."
+echo "Running tests..."
 
 # ESLint 검사
-echo "📋 Running ESLint..."
+echo "Running ESLint..."
 npm run lint
 
 # 포맷팅 검사
-echo "✨ Checking code formatting..."
+echo "Checking code formatting..."
 npm run format:check
 
 # Backend ESLint
-echo "📋 Running backend ESLint..."
+echo "Running backend ESLint..."
 cd backend
 npx eslint server.js || true
 cd ..
 
-echo "✅ All checks passed!"
+echo "[OK] All checks passed!"
 
