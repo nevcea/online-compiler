@@ -120,17 +120,24 @@
                     <div class="output-section">
                         <div class="output-header">
                             <span class="output-title" data-i18n="execution-result">실행 결과</span>
-                            <button
-                                id="copy-output-btn"
-                                class="copy-output-btn"
-                                title="Ctrl+Shift+C"
-                                style="display: none"
-                            >
-                                <span>📋</span> <span data-i18n="copy-output">출력 복사</span>
+                            <button id="clear-output-btn" class="clear-output-btn" title="Clear Output">
+                                <span>🗑️</span> <span data-i18n="clear-output">지우기</span>
                             </button>
                         </div>
                         <div id="output" class="output-content">
-                            <p class="text-muted" data-i18n="output-placeholder">실행 결과가 여기에 표시됩니다.</p>
+                            <div class="console-output" id="console-output">
+                                <p class="text-muted" data-i18n="output-placeholder">실행 결과가 여기에 표시됩니다.</p>
+                            </div>
+                            <div class="console-input-wrapper">
+                                <span class="console-prompt">&gt;</span>
+                                <input
+                                    type="text"
+                                    id="console-input"
+                                    class="console-input"
+                                    data-i18n-placeholder="console-input-placeholder"
+                                    autocomplete="off"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

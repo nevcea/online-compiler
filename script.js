@@ -34,9 +34,11 @@ const translations = {
         'no-output': '출력이 없습니다.',
         'connection-error': '연결 오류',
         'check-backend': '백엔드 서버가 실행 중인지 확인해주세요.',
-        'copy-output': '출력 복사',
-        copied: '복사됨!',
         'code-saved': '코드가 자동 저장되었습니다.',
+        'clear-output': '지우기',
+        'input-label': '입력:',
+        'input-placeholder': '프로그램에 전달할 입력을 입력하세요...',
+        'console-input-placeholder': '입력 (Enter로 실행)',
         shortcuts: '단축키',
         'run-code': '코드 실행',
         'clear-code': '코드 초기화',
@@ -81,9 +83,11 @@ const translations = {
         'no-output': 'No output.',
         'connection-error': 'Connection error',
         'check-backend': 'Please check if the backend server is running.',
-        'copy-output': 'Copy Output',
-        copied: 'Copied!',
         'code-saved': 'Code auto-saved.',
+        'clear-output': 'Clear',
+        'input-label': 'Input:',
+        'input-placeholder': 'Enter input to pass to the program...',
+        'console-input-placeholder': 'Input (Press Enter to run)',
         shortcuts: 'Shortcuts',
         'run-code': 'Run Code',
         'clear-code': 'Clear Code',
@@ -192,6 +196,13 @@ function updateLanguage(lang) {
         }
     });
 
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
+        const key = element.getAttribute('data-i18n-placeholder');
+        if (translations[lang]?.[key]) {
+            element.placeholder = translations[lang][key];
+        }
+    });
+
     document.title = translations[lang]['title'];
 
     const langIcon = document.getElementById('lang-icon');
@@ -215,12 +226,6 @@ function applyTheme(themePreference) {
     if (codeEditor) {
         monaco.editor.setTheme(actualTheme === 'dark' ? 'vs-dark' : 'vs');
     }
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 function createIconElement(iconUrl) {
@@ -323,6 +328,9 @@ function initEditor() {
             codeEditorElement: document.getElementById('code-editor'),
             runButton: document.getElementById('run-btn'),
             clearButton: document.getElementById('clear-btn'),
+            clearOutputButton: document.getElementById('clear-output-btn'),
+            consoleInput: document.getElementById('console-input'),
+            consoleOutput: document.getElementById('console-output'),
             output: document.getElementById('output')
         };
 
@@ -477,7 +485,10 @@ function initEditor() {
             setEditorValue(savedCode);
             updateAutoComplete();
 
-            elements.output.innerHTML = `<p class="text-muted">${translations[currentLang]['output-placeholder']}</p>`;
+            clearConsole();
+            if (elements.consoleOutput) {
+                elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['output-placeholder']}</p>`;
+            }
         }
 
         function confirmLanguageChange() {
@@ -495,7 +506,10 @@ function initEditor() {
             const template = LANGUAGE_CONFIG.templates[selectedLanguage] || '';
             setEditorValue(template);
             localStorage.removeItem(`code_${selectedLanguage}`);
-            elements.output.innerHTML = `<p class="text-muted">${translations[currentLang]['output-placeholder']}</p>`;
+            clearConsole();
+            if (elements.consoleOutput) {
+                elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['output-placeholder']}</p>`;
+            }
             modals.clearConfirm.hide();
         }
 
@@ -560,6 +574,24 @@ function initEditor() {
             modals.clearConfirm.show();
         });
 
+        if (elements.clearOutputButton) {
+            elements.clearOutputButton.addEventListener('click', () => {
+                clearConsole();
+                if (elements.consoleOutput) {
+                    elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['output-placeholder']}</p>`;
+                }
+            });
+        }
+
+        if (elements.consoleInput) {
+            elements.consoleInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter' && !elements.runButton.disabled && elements.consoleInput.value.trim()) {
+                    e.preventDefault();
+                    await executeCode();
+                }
+            });
+        }
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 modals.languageChange.hide();
@@ -569,12 +601,42 @@ function initEditor() {
 
         let abortController = null;
 
+        function appendToConsole(text, type = 'output') {
+            if (!elements.consoleOutput) {
+                return;
+            }
+
+            const line = document.createElement('div');
+            line.className = `console-line console-${type}`;
+
+            if (type === 'input') {
+                line.textContent = text;
+            } else {
+                line.textContent = text;
+            }
+
+            elements.consoleOutput.appendChild(line);
+            elements.consoleOutput.scrollTop = elements.consoleOutput.scrollHeight;
+        }
+
+        function clearConsole() {
+            if (elements.consoleOutput) {
+                elements.consoleOutput.innerHTML = '';
+            }
+            if (elements.consoleInput) {
+                elements.consoleInput.value = '';
+            }
+        }
+
         async function executeCode() {
             const code = getEditorValue();
             const language = elements.languageSelect.value;
+            const input = elements.consoleInput ? elements.consoleInput.value : '';
 
             if (!code.trim()) {
-                elements.output.innerHTML = `<p class="text-muted">${translations[currentLang]['no-code-error']}</p>`;
+                if (elements.consoleOutput) {
+                    elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['no-code-error']}</p>`;
+                }
                 return;
             }
 
@@ -585,15 +647,24 @@ function initEditor() {
 
             saveCodeToStorage();
 
+            const inputValue = input;
+            if (elements.consoleInput) {
+                elements.consoleInput.value = '';
+                elements.consoleInput.disabled = true;
+            }
+
             elements.runButton.disabled = true;
             elements.runButton.textContent = translations[currentLang]['running'] || '실행 중...';
-            elements.output.innerHTML = `<p class="text-muted">${translations[currentLang]['executing'] || '코드를 실행하고 있습니다...'}</p>`;
+
+            if (inputValue && inputValue.trim()) {
+                appendToConsole(inputValue, 'input');
+            }
 
             try {
                 const response = await fetch(`${CONFIG.API_URL}/api/execute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code, language, input: '' }),
+                    body: JSON.stringify({ code, language, input }),
                     signal: abortController.signal
                 });
 
@@ -605,81 +676,68 @@ function initEditor() {
                 const hasOutput = data.output?.trim().length > 0;
                 const hasError = data.error?.trim().length > 0;
 
-                let outputHtml = '';
-                if (hasError && !hasOutput) {
-                    outputHtml = `
-                        <div class="output-error">
-                            <p><strong>${translations[currentLang]['error'] || '오류'}:</strong></p>
-                            <pre id="error-text">${escapeHtml(data.error)}</pre>
-                        </div>
-                    `;
-                } else {
-                    if (hasOutput) {
-                        outputHtml += `
-                            <div class="output-success">
-                                <p><strong>${translations[currentLang]['output'] || '출력'}:</strong></p>
-                                <pre id="output-text">${escapeHtml(data.output)}</pre>
-                            </div>
-                        `;
-                    }
-                    if (hasError) {
-                        outputHtml += `
-                            <div class="output-error">
-                                <p><strong>${translations[currentLang]['error'] || '오류'}:</strong></p>
-                                <pre id="error-text">${escapeHtml(data.error)}</pre>
-                            </div>
-                        `;
-                    }
-                    if (data.executionTime !== undefined) {
-                        outputHtml += `<p class="text-muted">${translations[currentLang]['execution-time'] || '실행 시간'}: ${data.executionTime}ms</p>`;
-                    }
+                if (data.images && data.images.length > 0) {
+                    data.images.forEach((img) => {
+                        const imgLine = document.createElement('div');
+                        imgLine.className = 'console-line console-image';
+                        const imgElement = document.createElement('img');
+                        imgElement.src = img.data;
+                        imgElement.alt = img.name;
+                        imgElement.style.maxWidth = '100%';
+                        imgElement.style.height = 'auto';
+                        imgElement.style.marginTop = '0.5rem';
+                        imgElement.style.borderRadius = '4px';
+                        imgLine.appendChild(imgElement);
+                        if (elements.consoleOutput) {
+                            elements.consoleOutput.appendChild(imgLine);
+                            elements.consoleOutput.scrollTop = elements.consoleOutput.scrollHeight;
+                        }
+                    });
                 }
 
-                elements.output.innerHTML =
-                    outputHtml ||
-                    `<p class="text-muted">${translations[currentLang]['no-output'] || '출력이 없습니다.'}</p>`;
-
-                const copyBtn = document.getElementById('copy-output-btn');
-                if (copyBtn) {
-                    const hasContent = hasOutput || hasError;
-                    copyBtn.style.display = hasContent ? 'flex' : 'none';
-                    if (hasContent) {
-                        copyBtn.onclick = () => {
-                            const outputText =
-                                elements.output.querySelector('#output-text') ||
-                                elements.output.querySelector('#error-text');
-                            if (outputText) {
-                                navigator.clipboard.writeText(outputText.textContent).then(() => {
-                                    const originalText = copyBtn.querySelector('span:last-child').textContent;
-                                    copyBtn.querySelector('span:last-child').textContent =
-                                        translations[currentLang]['copied'] || 'Copied!';
-                                    setTimeout(() => {
-                                        copyBtn.querySelector('span:last-child').textContent = originalText;
-                                    }, 2000);
-                                });
-                            }
-                        };
-                    }
+                if (hasOutput) {
+                    const lines = data.output.split('\n');
+                    lines.forEach((line) => {
+                        if (line.trim() || lines.indexOf(line) < lines.length - 1) {
+                            appendToConsole(line, 'output');
+                        }
+                    });
                 }
 
-                const outputElement =
-                    elements.output.querySelector('#output-text') || elements.output.querySelector('#error-text');
-                if (outputElement) {
-                    setTimeout(() => {
-                        outputElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }, 100);
+                if (hasError) {
+                    const errorLines = data.error.split('\n');
+                    errorLines.forEach((line) => {
+                        if (line.trim() || errorLines.length === 1) {
+                            appendToConsole(line, 'error');
+                        }
+                    });
+                }
+
+                if (!hasOutput && !hasError && !inputValue && (!data.images || data.images.length === 0)) {
+                    appendToConsole(translations[currentLang]['no-output'] || '출력이 없습니다.', 'info');
+                }
+
+                if (elements.consoleInput) {
+                    elements.consoleInput.disabled = false;
+                    elements.consoleInput.focus();
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
                     return;
                 }
-                elements.output.innerHTML = `
-                    <div class="output-error">
-                        <p><strong>${translations[currentLang]['connection-error'] || '연결 오류'}:</strong></p>
-                        <p>${escapeHtml(error.message)}</p>
-                        <p class="text-muted">${translations[currentLang]['check-backend'] || '백엔드 서버가 실행 중인지 확인해주세요.'}</p>
-                    </div>
-                `;
+                if (elements.consoleOutput) {
+                    appendToConsole(
+                        `${translations[currentLang]['connection-error'] || '연결 오류'}: ${error.message}`,
+                        'error'
+                    );
+                    appendToConsole(
+                        translations[currentLang]['check-backend'] || '백엔드 서버가 실행 중인지 확인해주세요.',
+                        'info'
+                    );
+                }
+                if (elements.consoleInput) {
+                    elements.consoleInput.disabled = false;
+                }
             } finally {
                 elements.runButton.disabled = false;
                 elements.runButton.textContent = translations[currentLang]['run'];
@@ -693,7 +751,19 @@ function initEditor() {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
+
+                if (elements.consoleOutput) {
+                    clearConsole();
+                    elements.consoleOutput.innerHTML = '';
+                }
+
+                if (elements.consoleInput) {
+                    elements.consoleInput.disabled = false;
+                    elements.consoleInput.focus();
+                }
+
                 await executeCode();
+
                 return false;
             },
             true
@@ -1143,25 +1213,6 @@ function initEditor() {
                 { open: "'", close: "'" }
             ];
         }
-
-        codeEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyC, () => {
-            const outputText =
-                elements.output.querySelector('#output-text') || elements.output.querySelector('#error-text');
-            if (outputText) {
-                const text = outputText.textContent;
-                navigator.clipboard.writeText(text).then(() => {
-                    const copyBtn = document.getElementById('copy-output-btn');
-                    if (copyBtn) {
-                        const originalText = copyBtn.querySelector('span:last-child').textContent;
-                        copyBtn.querySelector('span:last-child').textContent =
-                            translations[currentLang]['copied'] || 'Copied!';
-                        setTimeout(() => {
-                            copyBtn.querySelector('span:last-child').textContent = originalText;
-                        }, 2000);
-                    }
-                });
-            }
-        });
 
         updateSelectedLanguage(CONFIG.DEFAULT_LANGUAGE);
         updateMonacoTheme();

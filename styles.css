@@ -1307,7 +1307,7 @@ tr:hover {
     align-items: center;
 }
 
-.copy-output-btn {
+.clear-output-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1321,12 +1321,12 @@ tr:hover {
     transition: all 0.2s ease;
 }
 
-.copy-output-btn:hover {
+.clear-output-btn:hover {
     background-color: var(--bg-primary);
-    border-color: var(--accent-primary);
+    border-color: var(--error-color);
 }
 
-.copy-output-btn:active {
+.clear-output-btn:active {
     transform: scale(0.95);
 }
 
@@ -1340,6 +1340,13 @@ tr:hover {
 
 .output-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+}
+
+.console-output {
+    flex: 1;
     padding: 0.75rem 1rem;
     font-family: 'Courier New', Courier, 'Consolas', 'Monaco', monospace;
     font-size: 14px;
@@ -1348,7 +1355,89 @@ tr:hover {
     word-wrap: break-word;
     overflow-y: auto;
     color: var(--text-primary);
-    min-height: 120px;
+    min-height: 100px;
+    max-height: 400px;
+}
+
+.console-line {
+    margin: 0.25rem 0;
+    word-wrap: break-word;
+}
+
+.console-line.console-output {
+    color: var(--text-primary);
+}
+
+.console-line.console-error {
+    color: var(--error-color);
+}
+
+.console-line.console-info {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.console-line.console-input {
+    color: var(--text-primary);
+}
+
+.console-line.console-image {
+    margin: 0.5rem 0;
+}
+
+.console-line.console-image img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.console-prompt-inline {
+    color: var(--accent-primary);
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+.console-input-text {
+    color: var(--accent-primary);
+}
+
+.console-input-wrapper {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    gap: 0.5rem;
+}
+
+.console-prompt {
+    color: var(--accent-primary);
+    font-weight: bold;
+    font-family: 'Courier New', Courier, 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.console-input {
+    flex: 1;
+    background-color: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: 'Courier New', Courier, 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    padding: 0;
+    outline: none;
+}
+
+.console-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.console-input::placeholder {
+    color: var(--text-muted);
 }
 
 .output-content pre {

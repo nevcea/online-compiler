@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const fs = require('fs').promises;
 const fss = require('fs');
 const path = require('path');
@@ -643,13 +643,14 @@ function convertToDockerPath(filePath) {
     return normalized;
 }
 
-function buildDockerCommand(language, hostCodePath, opts = {}) {
+
+function buildDockerArgs(language, hostCodePath, opts = {}) {
     if (!validateLanguage(language)) {
         throw new Error('Invalid language');
     }
 
     if (!validatePath(hostCodePath)) {
-        throw new Error('Invalid file path');
+        throw new Error('Invalid code path');
     }
 
     const config = LANGUAGE_CONFIGS[language];
@@ -672,21 +673,44 @@ function buildDockerCommand(language, hostCodePath, opts = {}) {
         throw new Error('Invalid container path format');
     }
 
-    const escapedCommand = command.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
-    const volumeMounts = [`-v ${dockerHostPath}:${containerPath}:ro`];
+    const args = ['run', '--rm'];
+    if (opts.hasInput) {
+        args.push('-i');
+    }
+    args.push(`--memory=${MAX_MEMORY}`);
+    args.push(`--cpus=${language === 'kotlin' ? MAX_CPU_PERCENT_KOTLIN : MAX_CPU_PERCENT}`);
+    if (!(language === 'kotlin' && !kotlinCompilerExistsOnHost())) {
+        args.push('--network=none');
+    }
+    args.push('--read-only');
+    args.push('--tmpfs');
+    args.push(`/tmp:rw,exec,nosuid,size=${tmpfsSize},noatime`);
+
+    args.push('-v');
+    args.push(`${dockerHostPath}:${containerPath}:ro`);
+
     if (language === 'kotlin') {
         const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
-        volumeMounts.push(`-v ${hostKotlinCache}:/opt/kotlin`);
+        args.push('-v');
+        args.push(`${hostKotlinCache}:/opt/kotlin`);
         if (opts.kotlinBuildDirHost) {
             const hostBuildDir = convertToDockerPath(opts.kotlinBuildDirHost);
-            volumeMounts.push(`-v ${hostBuildDir}:/opt/kbuild`);
+            args.push('-v');
+            args.push(`${hostBuildDir}:/opt/kbuild`);
         }
     }
-    const needsNetwork = language === 'kotlin' && !kotlinCompilerExistsOnHost();
-    const networkFlag = needsNetwork ? '' : '--network=none ';
-    const cpus = language === 'kotlin' ? MAX_CPU_PERCENT_KOTLIN : MAX_CPU_PERCENT;
+    if (opts.outputDirHost) {
+        const hostOutputDir = convertToDockerPath(opts.outputDirHost);
+        args.push('-v');
+        args.push(`${hostOutputDir}:/output:rw`);
+    }
 
-    return `docker run --rm --memory=${MAX_MEMORY} --cpus=${cpus} ${networkFlag}--read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize},noatime ${volumeMounts.join(' ')} ${config.image} sh -c "${escapedCommand}"`;
+    args.push(config.image);
+    args.push('sh');
+    args.push('-c');
+    args.push(command);
+
+    return args;
 }
 
 function validateJavaClass(code) {
@@ -729,15 +753,64 @@ async function writeCodeFile(codePath, code, language) {
         await fs.writeFile(filePath, code, 'utf8');
         return filePath;
     }
+    if (language === 'r') {
+        const extension = LANGUAGE_EXTENSIONS[language];
+        const fullPath = resolvedCodePath + extension;
+        const plotPattern = /plot\s*\(|ggplot\s*\(|barplot\s*\(|hist\s*\(|boxplot\s*\(|pie\s*\(/i;
+        const hasPlot = plotPattern.test(code);
+        let modifiedCode = code;
+        if (hasPlot) {
+            modifiedCode = `png('/output/plot.png', width=800, height=600, res=100)\n${code}\ndev.off()\n`;
+        }
+        await fs.writeFile(fullPath, modifiedCode, 'utf8');
+        return fullPath;
+    }
     const extension = LANGUAGE_EXTENSIONS[language];
     const fullPath = resolvedCodePath + extension;
     await fs.writeFile(fullPath, code, 'utf8');
     return fullPath;
 }
 
-function handleExecutionResult(error, stdout, stderr, executionTime, res) {
+async function findImageFiles(outputDir) {
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.bmp', '.webp'];
+    const images = [];
+
+    try {
+        const files = await fs.readdir(outputDir);
+        for (const file of files) {
+            const ext = path.extname(file).toLowerCase();
+            if (imageExtensions.includes(ext)) {
+                const filePath = path.join(outputDir, file);
+                try {
+                    const imageBuffer = await fs.readFile(filePath);
+                    const base64 = imageBuffer.toString('base64');
+                    const mimeType = ext === '.svg' ? 'image/svg+xml' : `image/${ext.slice(1)}`;
+                    images.push({
+                        name: file,
+                        data: `data:${mimeType};base64,${base64}`
+                    });
+                    await fs.unlink(filePath).catch(() => {});
+                } catch { ; }
+            }
+        }
+    } catch { ; }
+
+    return images;
+}
+
+async function handleExecutionResult(error, stdout, stderr, executionTime, res, outputDir = null) {
     const filteredStderr = filterDockerMessages(stderr || '');
     const hasStdout = stdout && stdout.trim().length > 0;
+
+    let images = [];
+    if (outputDir) {
+        images = await findImageFiles(outputDir);
+        try {
+            await fs.rmdir(outputDir).catch(() => {});
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
 
     if (error) {
         const errorMsg =
@@ -748,19 +821,21 @@ function handleExecutionResult(error, stdout, stderr, executionTime, res) {
         return res.json({
             output: stdout || '',
             error: errorMsg,
-            executionTime
+            executionTime,
+            images
         });
     }
 
     res.json({
         output: hasStdout ? stdout : '',
         error: hasStdout ? '' : filteredStderr,
-        executionTime
+        executionTime,
+        images
     });
 }
 
 app.post('/api/execute', executeLimiter, async (req, res) => {
-    const { code, language } = req.body;
+    const { code, language, input = '' } = req.body;
     let responseSent = false;
 
     const sendResponse = (statusCode, data) => {
@@ -798,6 +873,9 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
             throw new Error('Invalid file path generated');
         }
 
+        const sessionOutputDir = path.join(outputDir, sessionId);
+        await fs.mkdir(sessionOutputDir, { recursive: true });
+
         let buildOptions = {};
         if (language === 'kotlin') {
             const codeHash = crypto.createHash('sha1').update(code).digest('hex');
@@ -805,25 +883,99 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
             await fs.mkdir(hostBuildDir, { recursive: true });
             buildOptions.kotlinBuildDirHost = hostBuildDir;
         }
-        const dockerCommand = buildDockerCommand(language, fullCodePath, buildOptions);
+        const hasInput = input && input.trim().length > 0;
+        buildOptions.hasInput = hasInput;
+        buildOptions.outputDirHost = sessionOutputDir;
         const config = LANGUAGE_CONFIGS[language];
         const startTime = Date.now();
 
-        exec(
-            dockerCommand,
-            {
+        if (hasInput) {
+            const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions);
+            const dockerProcess = spawn('docker', dockerArgs, {
                 timeout: config.timeout + 2000,
                 maxBuffer: 1024 * 1024 * 2
-            },
-            async (error, stdout, stderr) => {
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            dockerProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            dockerProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            dockerProcess.on('close', async (code) => {
                 const executionTime = Date.now() - startTime;
                 await cleanupFile(fullCodePath);
                 if (!responseSent) {
-                    handleExecutionResult(error, stdout, stderr, executionTime, res);
+                    const error = code !== 0 ? { code, killed: false, signal: null } : null;
+                    await handleExecutionResult(error, stdout, stderr, executionTime, res, sessionOutputDir);
                     responseSent = true;
                 }
-            }
-        );
+            });
+
+            dockerProcess.on('error', async (error) => {
+                const executionTime = Date.now() - startTime;
+                await cleanupFile(fullCodePath);
+                if (!responseSent) {
+                    await handleExecutionResult(error, stdout, stderr, executionTime, res, sessionOutputDir);
+                    responseSent = true;
+                }
+            });
+
+            dockerProcess.stdin.write(input);
+            dockerProcess.stdin.end();
+
+            setTimeout(() => {
+                if (!responseSent && dockerProcess && !dockerProcess.killed) {
+                    dockerProcess.kill('SIGTERM');
+                }
+            }, config.timeout + 2000);
+        } else {
+            const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions);
+            const dockerProcess = spawn('docker', dockerArgs, {
+                timeout: config.timeout + 2000
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            dockerProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            dockerProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            dockerProcess.on('close', async (code) => {
+                const executionTime = Date.now() - startTime;
+                await cleanupFile(fullCodePath);
+                if (!responseSent) {
+                    const error = code !== 0 ? { code, killed: false, signal: null } : null;
+                    await handleExecutionResult(error, stdout, stderr, executionTime, res, sessionOutputDir);
+                    responseSent = true;
+                }
+            });
+
+            dockerProcess.on('error', async (error) => {
+                const executionTime = Date.now() - startTime;
+                await cleanupFile(fullCodePath);
+                if (!responseSent) {
+                    await handleExecutionResult(error, stdout, stderr, executionTime, res, sessionOutputDir);
+                    responseSent = true;
+                }
+            });
+
+            setTimeout(() => {
+                if (!responseSent && dockerProcess && !dockerProcess.killed) {
+                    dockerProcess.kill('SIGTERM');
+                }
+            }, config.timeout + 2000);
+        }
     } catch (error) {
         await cleanupFile(fullCodePath);
         const sanitizedError = sanitizeError(error);
