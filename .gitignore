@@ -1,0 +1,93 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+package-lock.json
+backend/package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Code execution temporary files
+backend/code/*
+backend/output/*
+!backend/code/.gitkeep
+!backend/output/.gitkeep
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Testing
+.coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Misc
+*.bak
+*.cache
+.cache/
+.parcel-cache/
+

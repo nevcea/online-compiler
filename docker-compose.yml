@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/code:/app/code
+      - ./backend/output:/app/output
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+    networks:
+      - compiler-network
+
+networks:
+  compiler-network:
+    driver: bridge
+

@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>온라인 컴파일러</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Courier+Prime:wght@400;700&family=Red+Hat+Mono:wght@300;400;500;600;700&family=PT+Mono&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.3.2/css/flag-icons.min.css" />
+    </head>
+    <body>
+        <header>
+            <div class="container header-content">
+                <h1 data-i18n="title">온라인 컴파일러</h1>
+                <div class="header-actions">
+                    <button id="settings-btn" class="settings-toggle" aria-label="설정">
+                        <span class="settings-icon">⚙️</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div id="compiler-page" class="page active">
+            <main class="container">
+                <div class="compiler-layout">
+                    <div class="language-selector">
+                        <label for="language-select" data-i18n="programming-language">프로그래밍 언어:</label>
+                        <div class="custom-select-wrapper">
+                            <button
+                                type="button"
+                                class="custom-select-button"
+                                id="language-select-button"
+                                name="language"
+                            >
+                                <span class="language-icon" id="language-icon"></span>
+                                <span class="language-name" id="language-name">Python</span>
+                                <span class="select-arrow">▼</span>
+                            </button>
+                            <div class="custom-select-dropdown" id="language-dropdown">
+                                <div class="select-option" data-value="python">
+                                    <span class="language-icon"></span>
+                                    <span>Python</span>
+                                </div>
+                                <div class="select-option" data-value="javascript">
+                                    <span class="language-icon"></span>
+                                    <span>JavaScript</span>
+                                </div>
+                                <div class="select-option" data-value="java">
+                                    <span class="language-icon"></span>
+                                    <span>Java</span>
+                                </div>
+                                <div class="select-option" data-value="cpp">
+                                    <span class="language-icon"></span>
+                                    <span>C++</span>
+                                </div>
+                                <div class="select-option" data-value="c">
+                                    <span class="language-icon"></span>
+                                    <span>C</span>
+                                </div>
+                                <div class="select-option" data-value="rust">
+                                    <span class="language-icon"></span>
+                                    <span>Rust</span>
+                                </div>
+                                <div class="select-option" data-value="php">
+                                    <span class="language-icon"></span>
+                                    <span>PHP</span>
+                                </div>
+                            </div>
+                            <select id="language-select" class="language-select-hidden">
+                                <option value="python">Python</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="java">Java</option>
+                                <option value="cpp">C++</option>
+                                <option value="c">C</option>
+                                <option value="rust">Rust</option>
+                                <option value="php">PHP</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="editor-section">
+                        <div class="editor-header">
+                            <span class="editor-title" data-i18n="code-editor">코드 에디터</span>
+                        </div>
+                        <div class="editor-wrapper">
+                            <div id="code-editor"></div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button type="button" id="run-btn" class="run-button" data-i18n="run">실행</button>
+                        <button type="button" id="clear-btn" class="secondary" data-i18n="clear">초기화</button>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-header">
+                            <span class="output-title" data-i18n="execution-result">실행 결과</span>
+                            <button
+                                id="copy-output-btn"
+                                class="copy-output-btn"
+                                title="Ctrl+Shift+C"
+                                style="display: none"
+                            >
+                                <span>📋</span> <span data-i18n="copy-output">출력 복사</span>
+                            </button>
+                        </div>
+                        <div id="output" class="output-content">
+                            <p class="text-muted" data-i18n="output-placeholder">실행 결과가 여기에 표시됩니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div id="settings-page" class="page">
+            <main class="container">
+                <div class="settings-layout">
+                    <div class="settings-header">
+                        <h2 data-i18n="settings-title">설정</h2>
+                        <button id="back-btn" class="back-button" data-i18n="back">← 뒤로</button>
+                    </div>
+
+                    <div class="settings-content">
+                        <div class="settings-section">
+                            <h3 data-i18n="language-settings">언어 설정</h3>
+                            <div class="settings-item">
+                                <label for="settings-lang-select-button" data-i18n="interface-language"
+                                    >인터페이스 언어:</label
+                                >
+                                <div class="lang-select-wrapper">
+                                    <button
+                                        type="button"
+                                        class="lang-select-button"
+                                        id="settings-lang-select-button"
+                                        name="interface-language"
+                                    >
+                                        <span class="fi fi-kr" id="settings-lang-icon"></span>
+                                        <span id="settings-lang-name">한국어</span>
+                                        <span class="select-arrow">▼</span>
+                                    </button>
+                                    <div class="lang-select-dropdown" id="settings-lang-dropdown">
+                                        <div class="lang-option" data-lang="ko">
+                                            <span class="fi fi-kr"></span>
+                                            <span>한국어</span>
+                                        </div>
+                                        <div class="lang-option" data-lang="en">
+                                            <span class="fi fi-us"></span>
+                                            <span>English</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3 data-i18n="theme-settings">테마 설정</h3>
+                            <div class="settings-item">
+                                <label for="theme-select-button" data-i18n="theme">테마:</label>
+                                <div class="theme-select-wrapper">
+                                    <button
+                                        type="button"
+                                        class="theme-select-button"
+                                        id="theme-select-button"
+                                        name="theme"
+                                    >
+                                        <span id="theme-select-name">다크 모드</span>
+                                        <span class="select-arrow">▼</span>
+                                    </button>
+                                    <div class="theme-select-dropdown" id="theme-select-dropdown">
+                                        <div class="theme-option" data-theme="system">
+                                            <span data-i18n="system-theme">시스템 기본값</span>
+                                        </div>
+                                        <div class="theme-option" data-theme="dark">
+                                            <span data-i18n="dark-theme">다크 모드</span>
+                                        </div>
+                                        <div class="theme-option" data-theme="light">
+                                            <span data-i18n="light-theme">라이트 모드</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3 data-i18n="editor-settings">에디터 설정</h3>
+                            <div class="settings-item">
+                                <label for="font-select-button" data-i18n="font-family">폰트:</label>
+                                <div class="font-select-wrapper">
+                                    <button
+                                        type="button"
+                                        class="font-select-button"
+                                        id="font-select-button"
+                                        name="font-family"
+                                    >
+                                        <span id="font-select-name">Consolas</span>
+                                        <span class="select-arrow">▼</span>
+                                    </button>
+                                    <div class="font-select-dropdown" id="font-select-dropdown">
+                                        <div
+                                            class="font-option"
+                                            data-value="'Consolas', 'Monaco', 'Courier New', monospace"
+                                            data-name="Consolas"
+                                        >
+                                            <span style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace"
+                                                >Consolas</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Courier New', Courier, monospace"
+                                            data-name="Courier New"
+                                        >
+                                            <span style="font-family: 'Courier New', Courier, monospace"
+                                                >Courier New</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Monaco', 'Menlo', monospace"
+                                            data-name="Monaco"
+                                        >
+                                            <span style="font-family: 'Monaco', 'Menlo', monospace">Monaco</span>
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Fira Code', 'Consolas', monospace"
+                                            data-name="Fira Code"
+                                        >
+                                            <span style="font-family: 'Fira Code', 'Consolas', monospace"
+                                                >Fira Code</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'JetBrains Mono', 'Consolas', monospace"
+                                            data-name="JetBrains Mono"
+                                        >
+                                            <span style="font-family: 'JetBrains Mono', 'Consolas', monospace"
+                                                >JetBrains Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Source Code Pro', 'Consolas', monospace"
+                                            data-name="Source Code Pro"
+                                        >
+                                            <span style="font-family: 'Source Code Pro', 'Consolas', monospace"
+                                                >Source Code Pro</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Roboto Mono', 'Consolas', monospace"
+                                            data-name="Roboto Mono"
+                                        >
+                                            <span style="font-family: 'Roboto Mono', 'Consolas', monospace"
+                                                >Roboto Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value='D2Coding, "D2Coding ligature", "Consolas", monospace'
+                                            data-name="D2Coding"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family: D2Coding, 'D2Coding ligature', 'Consolas', monospace;
+                                                "
+                                                >D2Coding</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Inconsolata', 'Consolas', monospace"
+                                            data-name="Inconsolata"
+                                        >
+                                            <span style="font-family: 'Inconsolata', 'Consolas', monospace"
+                                                >Inconsolata</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Space Mono', 'Consolas', monospace"
+                                            data-name="Space Mono"
+                                        >
+                                            <span style="font-family: 'Space Mono', 'Consolas', monospace"
+                                                >Space Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'IBM Plex Mono', 'Consolas', monospace"
+                                            data-name="IBM Plex Mono"
+                                        >
+                                            <span style="font-family: 'IBM Plex Mono', 'Consolas', monospace"
+                                                >IBM Plex Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Courier Prime', 'Courier New', monospace"
+                                            data-name="Courier Prime"
+                                        >
+                                            <span style="font-family: 'Courier Prime', 'Courier New', monospace"
+                                                >Courier Prime</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Red Hat Mono', 'Consolas', monospace"
+                                            data-name="Red Hat Mono"
+                                        >
+                                            <span style="font-family: 'Red Hat Mono', 'Consolas', monospace"
+                                                >Red Hat Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'PT Mono', 'Consolas', monospace"
+                                            data-name="PT Mono"
+                                        >
+                                            <span style="font-family: 'PT Mono', 'Consolas', monospace">PT Mono</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <select id="font-family-select" class="font-select-hidden">
+                                    <option value="'Consolas', 'Monaco', 'Courier New', monospace">Consolas</option>
+                                    <option value="'Courier New', Courier, monospace">Courier New</option>
+                                    <option value="'Monaco', 'Menlo', monospace">Monaco</option>
+                                    <option value="'Fira Code', 'Consolas', monospace">Fira Code</option>
+                                    <option value="'JetBrains Mono', 'Consolas', monospace">JetBrains Mono</option>
+                                    <option value="'Source Code Pro', 'Consolas', monospace">Source Code Pro</option>
+                                    <option value="'Roboto Mono', 'Consolas', monospace">Roboto Mono</option>
+                                    <option value='D2Coding, "D2Coding ligature", "Consolas", monospace'>
+                                        D2Coding
+                                    </option>
+                                    <option value="'Inconsolata', 'Consolas', monospace">Inconsolata</option>
+                                    <option value="'Space Mono', 'Consolas', monospace">Space Mono</option>
+                                    <option value="'IBM Plex Mono', 'Consolas', monospace">IBM Plex Mono</option>
+                                    <option value="'Courier Prime', 'Courier New', monospace">Courier Prime</option>
+                                    <option value="'Red Hat Mono', 'Consolas', monospace">Red Hat Mono</option>
+                                    <option value="'PT Mono', 'Consolas', monospace">PT Mono</option>
+                                </select>
+                            </div>
+                            <div class="settings-item">
+                                <label for="font-size-slider" data-i18n="font-size">폰트 크기:</label>
+                                <div class="font-size-control">
+                                    <input
+                                        type="range"
+                                        id="font-size-slider"
+                                        name="font-size"
+                                        min="10"
+                                        max="24"
+                                        value="14"
+                                        step="1"
+                                    />
+                                    <span id="font-size-display">14px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div id="language-change-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 data-i18n="language-change-title">언어 변경 확인</h3>
+                </div>
+                <div class="modal-body">
+                    <p data-i18n="language-change-message">언어를 변경하면 현재 코드가 기본 템플릿으로 교체됩니다.</p>
+                    <p class="text-muted" data-i18n="continue-question">계속하시겠습니까?</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal-cancel-btn" class="secondary" data-i18n="cancel">취소</button>
+                    <button id="modal-confirm-btn" class="run-button" data-i18n="confirm">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="clear-confirm-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 data-i18n="clear-confirm-title">코드 초기화 확인</h3>
+                </div>
+                <div class="modal-body">
+                    <p data-i18n="clear-confirm-message">
+                        코드를 초기화하면 현재 작성한 코드가 모두 삭제되고 기본 템플릿으로 교체됩니다.
+                    </p>
+                    <p class="text-muted" data-i18n="continue-question">계속하시겠습니까?</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="clear-modal-cancel-btn" class="secondary" data-i18n="cancel">취소</button>
+                    <button id="clear-modal-confirm-btn" class="run-button" data-i18n="confirm">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+        <script src="script.js"></script>
+    </body>
+</html>

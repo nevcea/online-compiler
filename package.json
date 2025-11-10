@@ -1,0 +1,26 @@
+{
+  "name": "online-compiler",
+  "version": "1.0.0",
+  "description": "Online code compiler with multiple language support",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,css,html}\"",
+    "format:check": "prettier --check \"**/*.{js,json,css,html}\"",
+    "dev": "node scripts/dev.js",
+    "test": "node scripts/test.js",
+    "clean": "node scripts/clean.js",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "eslint": "^9.15.0",
+    "globals": "^15.11.0",
+    "prettier": "^3.3.3"
+  }
+}
