@@ -111,7 +111,11 @@ const LANGUAGE_CONFIG = {
         cpp: 'cpp',
         c: 'c',
         rust: 'rust',
-        php: 'php'
+        php: 'php',
+        r: 'r',
+        ruby: 'ruby',
+        csharp: 'csharp',
+        kotlin: 'kotlin'
     },
     templates: {
         python: 'print("Hello, World!")',
@@ -120,16 +124,24 @@ const LANGUAGE_CONFIG = {
         cpp: '#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}',
         c: '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}',
         rust: 'fn main() {\n    println!("Hello, World!");\n}',
-        php: '<?php\n\necho "Hello, World!\\n";\n?>'
+        php: '<?php\n\necho "Hello, World!\\n";\n?>',
+        r: 'cat("Hello, World!\\n")',
+        ruby: 'puts "Hello, World!"',
+        csharp: 'using System;\n\nclass Program\n{\n    static void Main()\n    {\n        Console.WriteLine("Hello, World!");\n    }\n}',
+        kotlin: 'fun main() {\n    println("Hello, World!")\n}'
     },
     icons: {
-        python: 'https://img.icons8.com/color/48/000000/python.png',
-        javascript: 'https://img.icons8.com/color/48/000000/javascript.png',
-        java: 'https://img.icons8.com/color/48/000000/java-coffee-cup-logo.png',
-        cpp: 'https://img.icons8.com/color/48/000000/c-plus-plus-logo.png',
-        c: 'https://img.icons8.com/color/48/000000/c-programming.png',
-        rust: 'https://img.icons8.com/color/48/000000/rust.png',
-        php: 'https://img.icons8.com/color/48/000000/php.png'
+        python: 'https://img.icons8.com/color/48/python.png',
+        javascript: 'https://img.icons8.com/color/48/javascript.png',
+        java: 'https://img.icons8.com/color/48/java-coffee-cup-logo.png',
+        cpp: 'https://img.icons8.com/color/48/c-plus-plus-logo.png',
+        c: 'https://img.icons8.com/color/48/c-programming.png',
+        rust: 'https://img.icons8.com/color/48/rust.png',
+        php: 'https://img.icons8.com/color/48/php.png',
+        r: 'https://www.r-project.org/logo/Rlogo.png',
+        ruby: 'https://img.icons8.com/color/48/ruby-programming-language.png',
+        csharp: 'https://img.icons8.com/color/48/c-sharp-logo.png',
+        kotlin: 'https://img.icons8.com/color/48/kotlin.png'
     },
     names: {
         python: 'Python',
@@ -138,7 +150,11 @@ const LANGUAGE_CONFIG = {
         cpp: 'C++',
         c: 'C',
         rust: 'Rust',
-        php: 'PHP'
+        php: 'PHP',
+        r: 'R',
+        ruby: 'Ruby',
+        csharp: 'C#',
+        kotlin: 'Kotlin'
     }
 };
 
@@ -787,7 +803,11 @@ function initEditor() {
                 cpp: /[a-zA-Z_][a-zA-Z0-9_]*/g,
                 c: /[a-zA-Z_][a-zA-Z0-9_]*/g,
                 rust: /[a-zA-Z_][a-zA-Z0-9_]*/g,
-                php: /[a-zA-Z_$][a-zA-Z0-9_$]*/g
+                php: /[a-zA-Z_$][a-zA-Z0-9_$]*/g,
+                r: /[a-zA-Z_][a-zA-Z0-9_.]*/g,
+                ruby: /[a-zA-Z_][a-zA-Z0-9_?!]*/g,
+                csharp: /[a-zA-Z_][a-zA-Z0-9_]*/g,
+                kotlin: /[a-zA-Z_][a-zA-Z0-9_]*/g
             };
 
             const pattern = wordPatterns[language] || /[a-zA-Z_][a-zA-Z0-9_]*/g;
@@ -948,6 +968,108 @@ function initEditor() {
                     'namespace',
                     'new',
                     'this'
+                ],
+                r: [
+                    'if',
+                    'else',
+                    'for',
+                    'while',
+                    'function',
+                    'return',
+                    'break',
+                    'next',
+                    'repeat',
+                    'in',
+                    'TRUE',
+                    'FALSE',
+                    'NULL',
+                    'NA',
+                    'Inf',
+                    'NaN'
+                ],
+                ruby: [
+                    'if',
+                    'else',
+                    'elsif',
+                    'end',
+                    'for',
+                    'while',
+                    'until',
+                    'def',
+                    'class',
+                    'module',
+                    'return',
+                    'break',
+                    'next',
+                    'redo',
+                    'retry',
+                    'begin',
+                    'rescue',
+                    'ensure',
+                    'true',
+                    'false',
+                    'nil',
+                    'self',
+                    'super'
+                ],
+                csharp: [
+                    'if',
+                    'else',
+                    'for',
+                    'while',
+                    'foreach',
+                    'class',
+                    'public',
+                    'private',
+                    'protected',
+                    'static',
+                    'void',
+                    'return',
+                    'try',
+                    'catch',
+                    'finally',
+                    'using',
+                    'namespace',
+                    'new',
+                    'this',
+                    'base',
+                    'var',
+                    'const',
+                    'readonly'
+                ],
+                kotlin: [
+                    'if',
+                    'else',
+                    'for',
+                    'while',
+                    'when',
+                    'fun',
+                    'class',
+                    'object',
+                    'interface',
+                    'public',
+                    'private',
+                    'protected',
+                    'internal',
+                    'open',
+                    'abstract',
+                    'sealed',
+                    'data',
+                    'enum',
+                    'return',
+                    'break',
+                    'continue',
+                    'try',
+                    'catch',
+                    'finally',
+                    'throw',
+                    'val',
+                    'var',
+                    'null',
+                    'true',
+                    'false',
+                    'this',
+                    'super'
                 ]
             };
             return keywords[language]?.includes(word) || false;
@@ -961,7 +1083,11 @@ function initEditor() {
                 cpp: '//',
                 c: '//',
                 rust: '//',
-                php: '//'
+                php: '//',
+                r: '#',
+                ruby: '#',
+                csharp: '//',
+                kotlin: '//'
             };
             return comments[language] || '//';
         }
@@ -974,7 +1100,11 @@ function initEditor() {
                 cpp: { open: '/*', close: '*/' },
                 c: { open: '/*', close: '*/' },
                 rust: { open: '/*', close: '*/' },
-                php: { open: '/*', close: '*/' }
+                php: { open: '/*', close: '*/' },
+                r: null,
+                ruby: null,
+                csharp: { open: '/*', close: '*/' },
+                kotlin: { open: '/*', close: '*/' }
             };
             return comments[language] || null;
         }

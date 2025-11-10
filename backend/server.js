@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { exec } = require('child_process');
 const fs = require('fs').promises;
+const fss = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
@@ -13,9 +14,36 @@ const MAX_CODE_LENGTH = 100000;
 const MAX_EXECUTION_TIME = 10000;
 const MAX_MEMORY = '256m';
 const MAX_CPU_PERCENT = '2.0';
+const MAX_CPU_PERCENT_KOTLIN = '3.0';
 
 const codeDir = path.join(__dirname, 'code');
 const outputDir = path.join(__dirname, 'output');
+const toolCacheDir = path.join(__dirname, 'tool_cache');
+const kotlinCacheDir = path.join(toolCacheDir, 'kotlin');
+const kotlinBuildsDir = path.join(toolCacheDir, 'kotlin_builds');
+
+function kotlinCompilerExistsOnHost() {
+    try {
+        const p = path.join(kotlinCacheDir, 'kotlinc', 'lib', 'kotlin-compiler.jar');
+        return fss.existsSync(p);
+    } catch {
+        return false;
+    }
+}
+
+async function warmupKotlinOnStart() {
+    if (kotlinCompilerExistsOnHost()) {
+        return;
+    }
+    const image = 'eclipse-temurin:17-jdk-alpine';
+    const cmd =
+        'if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version';
+    try {
+        await runDockerCommand(image, cmd, '200m', 30000, true);
+    } catch {
+        // Ignore warmup errors
+    }
+}
 
 const LANGUAGE_EXTENSIONS = {
     python: '.py',
@@ -24,7 +52,11 @@ const LANGUAGE_EXTENSIONS = {
     cpp: '.cpp',
     c: '.c',
     rust: '.rs',
-    php: '.php'
+    php: '.php',
+    r: '.r',
+    ruby: '.rb',
+    csharp: '.cs',
+    kotlin: '.kt'
 };
 
 const LANGUAGE_CONFIGS = {
@@ -62,6 +94,28 @@ const LANGUAGE_CONFIGS = {
         image: 'php:alpine',
         command: (path) => `php ${path}`,
         timeout: MAX_EXECUTION_TIME
+    },
+    r: {
+        image: 'r-base:latest',
+        command: (path) => `Rscript ${path}`,
+        timeout: MAX_EXECUTION_TIME
+    },
+    ruby: {
+        image: 'ruby:alpine',
+        command: (path) => `ruby ${path}`,
+        timeout: MAX_EXECUTION_TIME
+    },
+    csharp: {
+        image: 'mcr.microsoft.com/dotnet/sdk:8.0',
+        command: (path) =>
+            `cd /tmp && dotnet new console -n Program --force && cp ${path} Program/Program.cs && cd Program && dotnet run --no-restore`,
+        timeout: MAX_EXECUTION_TIME * 2
+    },
+    kotlin: {
+        image: 'eclipse-temurin:17-jdk-alpine',
+        command: (path, buildDir) =>
+            `export JAVA_TOOL_OPTIONS="-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xms32m -Xmx256m"; if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; mkdir -p ${buildDir}/out; if [ ! -f ${buildDir}/out/CodeKt.class ]; then java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -d ${buildDir}/out ${path}; fi; java -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt`,
+        timeout: MAX_EXECUTION_TIME * 3
     }
 };
 
@@ -277,12 +331,22 @@ async function preloadDockerImages() {
     console.log(`✨ Preload completed in ${elapsed}s: ${totalSuccess} succeeded, ${totalFailed} failed`);
 }
 
-function runDockerCommand(image, command, tmpfsSize, timeout = 10000) {
+function runDockerCommand(image, command, tmpfsSize, timeout = 10000, allowNetwork = false) {
     if (!validateImage(image) || typeof command !== 'string' || typeof tmpfsSize !== 'string') {
         return Promise.reject(new Error('Invalid parameters'));
     }
     const escapedCommand = command.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-    const dockerCmd = `docker run --rm --memory=${tmpfsSize} --cpus=${MAX_CPU_PERCENT} --network=none --read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize} ${image} sh -c "${escapedCommand}"`;
+    const networkFlag = allowNetwork ? '' : '--network=none ';
+    const mounts = [];
+    if (allowNetwork) {
+        try {
+            const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
+            mounts.push(`-v ${hostKotlinCache}:/opt/kotlin`);
+        } catch {
+            // Ignore path conversion errors
+        }
+    }
+    const dockerCmd = `docker run --rm --memory=${tmpfsSize} --cpus=${MAX_CPU_PERCENT} ${networkFlag}--read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize} ${mounts.join(' ')} ${image} sh -c "${escapedCommand}"`;
 
     return new Promise((resolve, reject) => {
         const startTime = Date.now();
@@ -355,13 +419,49 @@ function getWarmupConfigs() {
             command: 'php -v',
             tmpfsSize: '50m',
             timeout: 5000
+        },
+        {
+            language: 'r',
+            image: 'r-base:latest',
+            command: 'Rscript --version',
+            tmpfsSize: '50m',
+            timeout: 10000
+        },
+        {
+            language: 'ruby',
+            image: 'ruby:alpine',
+            command: 'ruby -v',
+            tmpfsSize: '50m',
+            timeout: 5000
+        },
+        {
+            language: 'csharp',
+            image: 'mcr.microsoft.com/dotnet/sdk:8.0',
+            command: 'dotnet --version',
+            tmpfsSize: '100m',
+            timeout: 15000
+        },
+        {
+            language: 'kotlin',
+            image: 'eclipse-temurin:17-jdk-alpine',
+            command:
+                'if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version',
+            tmpfsSize: '200m',
+            timeout: 30000
         }
     ];
 }
 
 async function warmupContainer(config) {
     try {
-        const result = await runDockerCommand(config.image, config.command, config.tmpfsSize, config.timeout);
+        const allowNetwork = config.language === 'kotlin';
+        const result = await runDockerCommand(
+            config.image,
+            config.command,
+            config.tmpfsSize,
+            config.timeout,
+            allowNetwork
+        );
         return { success: true, language: config.language, elapsed: result.elapsed };
     } catch (error) {
         const errorInfo = error?.error || {};
@@ -465,6 +565,9 @@ async function ensureDirectories() {
     try {
         await fs.mkdir(codeDir, { recursive: true });
         await fs.mkdir(outputDir, { recursive: true });
+        await fs.mkdir(toolCacheDir, { recursive: true });
+        await fs.mkdir(kotlinCacheDir, { recursive: true });
+        await fs.mkdir(kotlinBuildsDir, { recursive: true });
     } catch (error) {
         console.error('Error creating directories:', error);
     }
@@ -526,6 +629,9 @@ function getContainerCodePath(language, extension) {
     if (language === 'java') {
         return '/tmp/Main.java';
     }
+    if (language === 'csharp') {
+        return '/tmp/Program.cs';
+    }
     return `/tmp/code${extension}`;
 }
 
@@ -537,7 +643,7 @@ function convertToDockerPath(filePath) {
     return normalized;
 }
 
-function buildDockerCommand(language, hostCodePath) {
+function buildDockerCommand(language, hostCodePath, opts = {}) {
     if (!validateLanguage(language)) {
         throw new Error('Invalid language');
     }
@@ -553,8 +659,9 @@ function buildDockerCommand(language, hostCodePath) {
 
     const extension = LANGUAGE_EXTENSIONS[language];
     const containerPath = getContainerCodePath(language, extension);
-    const command = config.command(containerPath);
-    const tmpfsSize = language === 'rust' ? '200m' : '50m';
+    const containerBuildDir = language === 'kotlin' ? '/opt/kbuild' : undefined;
+    const command = config.command(containerPath, containerBuildDir);
+    const tmpfsSize = language === 'rust' || language === 'kotlin' ? '200m' : language === 'csharp' ? '100m' : '50m';
     const dockerHostPath = convertToDockerPath(hostCodePath);
 
     if (dockerHostPath.includes(' ') || containerPath.includes(' ')) {
@@ -566,9 +673,20 @@ function buildDockerCommand(language, hostCodePath) {
     }
 
     const escapedCommand = command.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
-    const volumeMount = `${dockerHostPath}:${containerPath}:ro`;
+    const volumeMounts = [`-v ${dockerHostPath}:${containerPath}:ro`];
+    if (language === 'kotlin') {
+        const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
+        volumeMounts.push(`-v ${hostKotlinCache}:/opt/kotlin`);
+        if (opts.kotlinBuildDirHost) {
+            const hostBuildDir = convertToDockerPath(opts.kotlinBuildDirHost);
+            volumeMounts.push(`-v ${hostBuildDir}:/opt/kbuild`);
+        }
+    }
+    const needsNetwork = language === 'kotlin' && !kotlinCompilerExistsOnHost();
+    const networkFlag = needsNetwork ? '' : '--network=none ';
+    const cpus = language === 'kotlin' ? MAX_CPU_PERCENT_KOTLIN : MAX_CPU_PERCENT;
 
-    return `docker run --rm --memory=${MAX_MEMORY} --cpus=${MAX_CPU_PERCENT} --network=none --read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize},noatime -v ${volumeMount} ${config.image} sh -c "${escapedCommand}"`;
+    return `docker run --rm --memory=${MAX_MEMORY} --cpus=${cpus} ${networkFlag}--read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize},noatime ${volumeMounts.join(' ')} ${config.image} sh -c "${escapedCommand}"`;
 }
 
 function validateJavaClass(code) {
@@ -604,6 +722,11 @@ async function writeCodeFile(codePath, code, language) {
         const modifiedCode = code.replace(/public\s+class\s+\w+/, 'public class Main');
         const filePath = resolvedCodePath + '.java';
         await fs.writeFile(filePath, modifiedCode, 'utf8');
+        return filePath;
+    }
+    if (language === 'csharp') {
+        const filePath = resolvedCodePath + '.cs';
+        await fs.writeFile(filePath, code, 'utf8');
         return filePath;
     }
     const extension = LANGUAGE_EXTENSIONS[language];
@@ -675,7 +798,14 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
             throw new Error('Invalid file path generated');
         }
 
-        const dockerCommand = buildDockerCommand(language, fullCodePath);
+        let buildOptions = {};
+        if (language === 'kotlin') {
+            const codeHash = crypto.createHash('sha1').update(code).digest('hex');
+            const hostBuildDir = path.join(kotlinBuildsDir, codeHash);
+            await fs.mkdir(hostBuildDir, { recursive: true });
+            buildOptions.kotlinBuildDirHost = hostBuildDir;
+        }
+        const dockerCommand = buildDockerCommand(language, fullCodePath, buildOptions);
         const config = LANGUAGE_CONFIGS[language];
         const startTime = Date.now();
 
@@ -701,19 +831,29 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
     }
 });
 
-app.get('/api/health', healthLimiter, (req, res) => {
+app.get('/api/health', healthLimiter, (_, res) => {
     res.json({ status: 'ok' });
 });
 
-app.use((err, req, res, _next) => {
+app.use((err, _, res, _next) => {
     console.error('Unhandled error:', err.message || 'Unknown error');
     res.status(500).json({ error: 'Internal server error' });
 });
 
-ensureDirectories().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        preloadDockerImages();
+ensureDirectories()
+    .then(async () => {
+        await warmupKotlinOnStart();
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+            preloadDockerImages();
+        });
+        warmupContainers();
+    })
+    .catch((e) => {
+        console.error('Startup error:', e);
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+            preloadDockerImages();
+        });
+        warmupContainers();
     });
-    warmupContainers();
-});

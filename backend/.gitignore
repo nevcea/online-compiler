@@ -3,3 +3,4 @@ code/
 output/
 *.log
 .env
+tool_cache/
