@@ -1,38 +1,16 @@
 #!/usr/bin/env node
 
-// 테스트 실행 스크립트 (Node.js)
-
 const { execSync } = require('child_process');
-const fs = require('fs');
 const path = require('path');
 
-const isWindows = process.platform === 'win32';
-const scriptExt = isWindows ? '.ps1' : '.sh';
+const scriptPath = path.join(__dirname, 'test.ps1');
 
-function runScript(scriptName) {
-    const scriptPath = path.join(__dirname, `${scriptName}${scriptExt}`);
-
-    if (!fs.existsSync(scriptPath)) {
-        console.error(`[ERROR] Script not found: ${scriptPath}`);
-        process.exit(1);
-    }
-
-    try {
-        if (isWindows) {
-            execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}"`, {
-                stdio: 'inherit',
-                cwd: path.join(__dirname, '..')
-            });
-        } else {
-            execSync(`chmod +x "${scriptPath}" && "${scriptPath}"`, {
-                stdio: 'inherit',
-                cwd: path.join(__dirname, '..')
-            });
-        }
-    } catch (error) {
-        console.error(`[ERROR] Error running script: ${error.message}`);
-        process.exit(1);
-    }
+try {
+    execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}"`, {
+        stdio: 'inherit',
+        cwd: path.join(__dirname, '..')
+    });
+} catch (error) {
+    console.error(`[ERROR] Error running script: ${error.message}`);
+    process.exit(1);
 }
-
-runScript('test');
