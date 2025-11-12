@@ -63,12 +63,13 @@ export const translations = {
         'keyboard-shortcuts': '키보드 단축키',
         'shortcut-run-code': '코드 실행',
         'shortcut-show-help': '도움말 표시',
-        'shortcut-clear': '코드 초기화',
+        'shortcut-clear': '에디터 초기화',
         'shortcut-close-modal': '모달 닫기',
         close: '닫기',
         'to-run': '실행',
         'search-language': '언어 검색...',
-        'search-font': '폰트 검색...'
+        'search-font': '폰트 검색...',
+        'seconds': '초'
     },
     en: {
         title: 'Online Compiler',
@@ -135,12 +136,13 @@ export const translations = {
         'keyboard-shortcuts': 'Keyboard Shortcuts',
         'shortcut-run-code': 'Run code',
         'shortcut-show-help': 'Show keyboard shortcuts',
-        'shortcut-clear': 'Clear code',
+        'shortcut-clear': 'Clear editor',
         'shortcut-close-modal': 'Close modal/dropdown',
         close: 'Close',
         'to-run': 'to run',
         'search-language': 'Search language...',
-        'search-font': 'Search font...'
+        'search-font': 'Search font...',
+        'seconds': 's'
     }
 };
 

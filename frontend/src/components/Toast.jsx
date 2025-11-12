@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useApp } from '../context/AppContext';
 import './Toast.css';
 
 const Toast = ({ message, type = 'info', onClose, duration = 3000 }) => {
+    const { t } = useApp();
     const [isClosing, setIsClosing] = useState(false);
 
     useEffect(() => {
@@ -9,7 +11,6 @@ const Toast = ({ message, type = 'info', onClose, duration = 3000 }) => {
             let closeTimer = null;
             const timer = setTimeout(() => {
                 setIsClosing(true);
-                // 애니메이션 시간(200ms) 후 실제로 제거
                 closeTimer = setTimeout(() => {
                     onClose();
                 }, 200);
@@ -67,7 +68,7 @@ const Toast = ({ message, type = 'info', onClose, duration = 3000 }) => {
                     }, 200);
                 }}
                 className="toast-close"
-                aria-label="Close"
+                aria-label={t('close')}
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>

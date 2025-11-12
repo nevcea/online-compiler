@@ -33,7 +33,7 @@ const OutputPanel = memo(({ input, setInput, output, error }) => {
                         {t('execution-result')}
                         {executionTime !== null && !isRunning && (
                             <span className="execution-time">
-                                {(executionTime / 1000).toFixed(3)}초
+                                {(executionTime / 1000).toFixed(3)}{t('seconds')}
                             </span>
                         )}
                     </div>
