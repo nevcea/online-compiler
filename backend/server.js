@@ -5,21 +5,23 @@ const fs = require('fs').promises;
 const fss = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { promisify } = require('util');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const {
+    CONFIG,
+    TMPFS_SIZES,
+    CONTAINER_CODE_PATHS,
+    LANGUAGE_EXTENSIONS,
+    LANGUAGE_CONFIGS,
+    ALLOWED_LANGUAGES,
+    ALLOWED_IMAGES,
+    DANGEROUS_PATTERNS,
+    DOCKER_PULL_MESSAGES,
+    DEBUG_PATTERNS
+} = require('./config');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const MAX_CODE_LENGTH = 100000;
-const MAX_EXECUTION_TIME = 10000;
-const MAX_MEMORY = '256m';
-const MAX_CPU_PERCENT = '2.0';
-const MAX_CPU_PERCENT_KOTLIN = '3.0';
-const MAX_OUTPUT_BYTES = parseInt(process.env.MAX_OUTPUT_BYTES || '1048576', 10); // 1MB
-const MAX_INPUT_LENGTH = parseInt(process.env.MAX_INPUT_LENGTH || '1000000', 10); // 1MB
-const ENABLE_PRELOAD = (process.env.ENABLE_PRELOAD || 'true').toLowerCase() === 'true';
-const ENABLE_WARMUP = (process.env.ENABLE_WARMUP || 'true').toLowerCase() === 'true';
-const TRUST_PROXY = (process.env.TRUST_PROXY || 'false').toLowerCase() === 'true';
 
 const codeDir = path.join(__dirname, 'code');
 const outputDir = path.join(__dirname, 'output');
@@ -28,20 +30,21 @@ const kotlinCacheDir = path.join(toolCacheDir, 'kotlin');
 const kotlinBuildsDir = path.join(toolCacheDir, 'kotlin_builds');
 
 app.disable('x-powered-by');
-if (TRUST_PROXY) {
+if (CONFIG.TRUST_PROXY) {
     app.set('trust proxy', 1);
 }
 
 async function isDockerAvailable() {
-    return new Promise((resolve) => {
-        exec('docker version', { timeout: 3000 }, (error) => {
-            if (error) {
-                resolve(false);
-                return;
-            }
-            resolve(true);
-        });
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.DOCKER_CHECK_TIMEOUT);
+    try {
+        await promisify(exec)('docker version', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        return true;
+    } catch {
+        clearTimeout(timeoutId);
+        return false;
+    }
 }
 
 function kotlinCompilerExistsOnHost() {
@@ -61,136 +64,11 @@ async function warmupKotlinOnStart() {
     const cmd =
         'if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version';
     try {
-        await runDockerCommand(image, cmd, '200m', 30000, true);
+        await runDockerCommand(image, cmd, TMPFS_SIZES.kotlin, CONFIG.MAX_EXECUTION_TIME * 3, true);
     } catch {
-        // Ignore warmup errors
     }
 }
 
-const LANGUAGE_EXTENSIONS = {
-    python: '.py',
-    javascript: '.js',
-    java: '.java',
-    cpp: '.cpp',
-    c: '.c',
-    rust: '.rs',
-    php: '.php',
-    r: '.r',
-    ruby: '.rb',
-    csharp: '.cs',
-    kotlin: '.kt'
-};
-
-const LANGUAGE_CONFIGS = {
-    python: {
-        image: 'python:3.11-slim',
-        command: (path) => `python ${path}`,
-        timeout: MAX_EXECUTION_TIME
-    },
-    javascript: {
-        image: 'node:20-slim',
-        command: (path) => `node ${path}`,
-        timeout: MAX_EXECUTION_TIME
-    },
-    java: {
-        image: 'eclipse-temurin:17-jdk-alpine',
-        command: (path) => `javac ${path} && java -cp /tmp Main`,
-        timeout: MAX_EXECUTION_TIME * 2
-    },
-    cpp: {
-        image: 'gcc:14',
-        command: (path) => `g++ -O2 -s -o /tmp/a.out ${path} && /tmp/a.out`,
-        timeout: MAX_EXECUTION_TIME * 2
-    },
-    c: {
-        image: 'gcc:14',
-        command: (path) => `gcc -O2 -s -o /tmp/a.out ${path} && /tmp/a.out`,
-        timeout: MAX_EXECUTION_TIME * 2
-    },
-    rust: {
-        image: 'rust:1.81',
-        command: (path) => `rustc ${path} -o /tmp/a.out && chmod +x /tmp/a.out && /tmp/a.out`,
-        timeout: MAX_EXECUTION_TIME * 3
-    },
-    php: {
-        image: 'php:8.3-alpine',
-        command: (path) => `php ${path}`,
-        timeout: MAX_EXECUTION_TIME
-    },
-    r: {
-        image: 'r-base:4.4.1',
-        command: (path) => `Rscript ${path}`,
-        timeout: MAX_EXECUTION_TIME
-    },
-    ruby: {
-        image: 'ruby:3.3-alpine',
-        command: (path) => `ruby ${path}`,
-        timeout: MAX_EXECUTION_TIME
-    },
-    csharp: {
-        image: 'mcr.microsoft.com/dotnet/sdk:8.0',
-        command: (path) =>
-            `cd /tmp && dotnet new console -n Program --force && cp ${path} Program/Program.cs && cd Program && dotnet run --no-restore`,
-        timeout: MAX_EXECUTION_TIME * 2
-    },
-    kotlin: {
-        image: 'eclipse-temurin:17-jdk-alpine',
-        command: (path, buildDir) =>
-            `export JAVA_TOOL_OPTIONS="-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xms32m -Xmx256m"; if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; mkdir -p ${buildDir}/out; if [ ! -f ${buildDir}/out/CodeKt.class ]; then java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -d ${buildDir}/out ${path}; fi; java -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt`,
-        timeout: MAX_EXECUTION_TIME * 3
-    }
-};
-
-const ALLOWED_LANGUAGES = Object.keys(LANGUAGE_EXTENSIONS);
-const ALLOWED_IMAGES = Object.values(LANGUAGE_CONFIGS).map((config) => config.image);
-
-const DANGEROUS_PATTERNS = [
-    /rm\s+-rf/gi,
-    /mkfs/gi,
-    /dd\s+if=/gi,
-    /mkfs\./gi,
-    /\/dev\/sd/gi,
-    /fdisk/gi,
-    /format\s+c:/gi,
-    /del\s+\/f/gi,
-    /shutdown/gi,
-    /reboot/gi,
-    /halt/gi,
-    /poweroff/gi,
-    /docker/gi,
-    /sudo/gi,
-    /su\s/gi,
-    /chmod\s+[0-9]{3,4}/gi,
-    /chown/gi,
-    /mount/gi,
-    /umount/gi
-];
-
-const DOCKER_PULL_MESSAGES = [
-    'unable to find image',
-    'pulling from',
-    'pulling fs layer',
-    'pull complete',
-    'download complete',
-    'already exists',
-    'digest:',
-    'status: downloaded',
-    'status: image is up to date'
-];
-
-const INPUT_ERROR_PATTERNS = [
-    /EOF when reading a line/i,
-    /NoSuchElementException.*No line found/i,
-    /No line found/i
-];
-
-const ENTRYPOINT_ERROR_PATTERNS = [
-    /can't find '__main__' module/i,
-    /Main method not found in class/i,
-    /no main manifest attribute/i,
-    /undefined reference to `main'/i,
-    /Cannot find module/i
-];
 
 app.use(
     helmet({
@@ -316,53 +194,62 @@ function validatePath(filePath) {
     return normalized.startsWith(codeDirNormalized);
 }
 
-function checkImageExists(image) {
+async function checkImageExists(image) {
     if (!validateImage(image)) {
-        return Promise.resolve(false);
+        return false;
     }
-    return new Promise((resolve) => {
-        exec(`docker images -q ${image}`, { timeout: 5000 }, (error, stdout) => {
-            if (error) {
-                resolve(false);
-                return;
-            }
-            resolve(stdout.trim().length > 0);
-        });
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+        const { stdout } = await promisify(exec)(`docker images -q ${image}`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        return stdout.trim().length > 0;
+    } catch {
+        clearTimeout(timeoutId);
+        return false;
+    }
 }
 
-async function pullDockerImage(image, retries = 2) {
+async function pullDockerImage(image, retries = CONFIG.DOCKER_PULL_RETRIES) {
     if (!validateImage(image)) {
         return { success: false, image, error: 'Invalid image' };
     }
 
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            await new Promise((resolve, reject) => {
-                const pullProcess = exec(`docker pull ${image}`, { timeout: 300000 }, (error) => {
-                    if (error) {
-                        reject(error);
-                        return;
-                    }
-                    resolve();
-                });
-
-                pullProcess.stdout?.on('data', (data) => {
-                    process.stdout.write(`[${image}] ${data.toString().trim()}\n`);
-                });
-
-                pullProcess.stderr?.on('data', (data) => {
-                    process.stderr.write(`[${image}] ${data.toString().trim()}\n`);
-                });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.DOCKER_PULL_TIMEOUT);
+            
+            const pullProcess = exec(`docker pull ${image}`, { signal: controller.signal });
+            
+            pullProcess.stdout?.on('data', (data) => {
+                process.stdout.write(`[${image}] ${data.toString().trim()}\n`);
             });
 
+            pullProcess.stderr?.on('data', (data) => {
+                process.stderr.write(`[${image}] ${data.toString().trim()}\n`);
+            });
+
+            await new Promise((resolve, reject) => {
+                pullProcess.on('close', (code) => {
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Process exited with code ${code}`));
+                    }
+                });
+                pullProcess.on('error', reject);
+            });
+            
+            clearTimeout(timeoutId);
             return { success: true, image };
         } catch (error) {
             if (attempt < retries) {
+                const delay = CONFIG.DOCKER_PULL_RETRY_DELAY_BASE * (attempt + 1);
                 console.log(`[${image}] Pull failed, retrying... (${attempt + 1}/${retries})`);
-                await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+                await new Promise((resolve) => setTimeout(resolve, delay));
             } else {
-                return { success: false, image, error: error.message };
+                return { success: false, image, error: error.message || 'Unknown error' };
             }
         }
     }
@@ -370,17 +257,15 @@ async function pullDockerImage(image, retries = 2) {
 
 async function preloadDockerImages() {
     if (!(await isDockerAvailable())) {
-        console.warn(
-            '⚠️  Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)'
-        );
+        console.warn('[PRELOAD] Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)');
         return;
     }
-    console.log('🚀 Starting Docker images preload...');
+    console.log('[PRELOAD] Starting Docker images preload...');
     const startTime = Date.now();
     const images = Object.values(LANGUAGE_CONFIGS).map((config) => config.image);
     const uniqueImages = [...new Set(images)];
 
-    console.log(`📦 Checking ${uniqueImages.length} unique images...`);
+    console.log(`[PRELOAD] Checking ${uniqueImages.length} unique images...`);
 
     const checkPromises = uniqueImages.map(async (image) => {
         const exists = await checkImageExists(image);
@@ -392,32 +277,28 @@ async function preloadDockerImages() {
     const existingImages = checkResults.filter(({ exists }) => exists).map(({ image }) => image);
 
     if (existingImages.length > 0) {
-        console.log(
-            `✅ ${existingImages.length} images already exist: ${existingImages.join(', ')}`
-        );
+        console.log(`[PRELOAD] ${existingImages.length} images already exist: ${existingImages.join(', ')}`);
     }
 
     if (imagesToPull.length === 0) {
-        console.log('✨ All required images are already available!');
+        console.log('[PRELOAD] All required images are already available!');
         return;
     }
 
-    console.log(`📥 Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
+    console.log(`[PRELOAD] Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
 
-    const BATCH_SIZE = 3;
     const results = [];
 
-    for (let i = 0; i < imagesToPull.length; i += BATCH_SIZE) {
-        const batch = imagesToPull.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < imagesToPull.length; i += CONFIG.PRELOAD_BATCH_SIZE) {
+        const batch = imagesToPull.slice(i, i + CONFIG.PRELOAD_BATCH_SIZE);
         const batchPromises = batch.map((image) => pullDockerImage(image));
         const batchResults = await Promise.all(batchPromises);
         results.push(...batchResults);
 
         const successCount = batchResults.filter((r) => r.success).length;
         const failCount = batchResults.filter((r) => !r.success).length;
-        console.log(
-            `📊 Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successCount} succeeded, ${failCount} failed`
-        );
+        const batchNumber = Math.floor(i / CONFIG.PRELOAD_BATCH_SIZE) + 1;
+        console.log(`[PRELOAD] Batch ${batchNumber}: ${successCount} succeeded, ${failCount} failed`);
     }
 
     const totalSuccess = results.filter((r) => r.success).length;
@@ -426,18 +307,16 @@ async function preloadDockerImages() {
 
     if (totalFailed > 0) {
         const failedImages = results.filter((r) => !r.success).map((r) => r.image);
-        console.warn(`⚠️  Failed to pull ${totalFailed} images: ${failedImages.join(', ')}`);
-        console.warn('   These images will be pulled on first use.');
+        console.warn(`[PRELOAD] Failed to pull ${totalFailed} images: ${failedImages.join(', ')}`);
+        console.warn('[PRELOAD] These images will be pulled on first use.');
     }
 
-    console.log(
-        `✨ Preload completed in ${elapsed}s: ${totalSuccess} succeeded, ${totalFailed} failed`
-    );
+    console.log(`[PRELOAD] Completed in ${elapsed}s: ${totalSuccess} succeeded, ${totalFailed} failed`);
 }
 
-function runDockerCommand(image, command, tmpfsSize, timeout = 10000, allowNetwork = false) {
+async function runDockerCommand(image, command, tmpfsSize, timeout = 10000, allowNetwork = false) {
     if (!validateImage(image) || typeof command !== 'string' || typeof tmpfsSize !== 'string') {
-        return Promise.reject(new Error('Invalid parameters'));
+        throw new Error('Invalid parameters');
     }
     const escapedCommand = command.replace(/'/g, "'\\''").replace(/"/g, '\\"');
     const networkFlag = allowNetwork ? '' : '--network=none ';
@@ -447,30 +326,35 @@ function runDockerCommand(image, command, tmpfsSize, timeout = 10000, allowNetwo
             const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
             mounts.push(`-v ${hostKotlinCache}:/opt/kotlin`);
         } catch {
-            // Ignore path conversion errors
         }
     }
-    const dockerCmd = `docker run --rm --memory=${tmpfsSize} --cpus=${MAX_CPU_PERCENT} ${networkFlag}--read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize} ${mounts.join(' ')} ${image} sh -c "${escapedCommand}"`;
+    const dockerCmd = `docker run --rm --memory=${tmpfsSize} --cpus=${CONFIG.MAX_CPU_PERCENT} ${networkFlag}--read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize} ${mounts.join(' ')} ${image} sh -c "${escapedCommand}"`;
 
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        exec(dockerCmd, { timeout, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-            const elapsed = Date.now() - startTime;
-            if (error) {
-                const errorInfo = {
-                    message: error.message || 'Unknown error',
-                    code: error.code,
-                    signal: error.signal,
-                    killed: error.killed,
-                    stderr: stderr || '',
-                    stdout: stdout || ''
-                };
-                reject({ error: errorInfo, elapsed });
-                return;
-            }
-            resolve({ stdout, stderr, elapsed });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const startTime = Date.now();
+    
+    try {
+        const { stdout, stderr } = await promisify(exec)(dockerCmd, { 
+            signal: controller.signal,
+            maxBuffer: 1024 * 1024 
         });
-    });
+        clearTimeout(timeoutId);
+        const elapsed = Date.now() - startTime;
+        return { stdout, stderr, elapsed };
+    } catch (error) {
+        clearTimeout(timeoutId);
+        const elapsed = Date.now() - startTime;
+        const errorInfo = {
+            message: error.message || 'Unknown error',
+            code: error.code,
+            signal: error.signal,
+            killed: error.killed,
+            stderr: error.stderr || '',
+            stdout: error.stdout || ''
+        };
+        throw { error: errorInfo, elapsed };
+    }
 }
 
 function getWarmupConfigs() {
@@ -479,70 +363,70 @@ function getWarmupConfigs() {
             language: 'python',
             image: 'python:3.11-slim',
             command: 'python -V',
-            tmpfsSize: '50m',
-            timeout: 5000
+            tmpfsSize: TMPFS_SIZES.default,
+            timeout: 10000
         },
         {
             language: 'javascript',
             image: 'node:20-slim',
             command: 'node -v',
-            tmpfsSize: '50m',
+            tmpfsSize: TMPFS_SIZES.default,
             timeout: 5000
         },
         {
             language: 'c',
             image: 'gcc:14',
             command: 'gcc --version',
-            tmpfsSize: '50m',
+            tmpfsSize: TMPFS_SIZES.default,
             timeout: 10000
         },
         {
             language: 'cpp',
             image: 'gcc:14',
             command: 'g++ --version',
-            tmpfsSize: '50m',
+            tmpfsSize: TMPFS_SIZES.default,
             timeout: 10000
         },
         {
             language: 'java',
             image: 'eclipse-temurin:17-jdk-alpine',
             command: 'java -version',
-            tmpfsSize: '50m',
+            tmpfsSize: TMPFS_SIZES.default,
             timeout: 15000
         },
         {
             language: 'rust',
             image: 'rust:1.81',
             command: 'rustc --version',
-            tmpfsSize: '200m',
+            tmpfsSize: TMPFS_SIZES.rust,
             timeout: 15000
         },
         {
             language: 'php',
             image: 'php:8.3-alpine',
             command: 'php -v',
-            tmpfsSize: '50m',
-            timeout: 5000
+            tmpfsSize: TMPFS_SIZES.default,
+            timeout: 10000
         },
         {
             language: 'r',
             image: 'r-base:4.4.1',
             command: 'Rscript --version',
-            tmpfsSize: '50m',
+            tmpfsSize: TMPFS_SIZES.default,
             timeout: 10000
         },
         {
             language: 'ruby',
             image: 'ruby:3.3-alpine',
             command: 'ruby -v',
-            tmpfsSize: '50m',
-            timeout: 5000
+            tmpfsSize: TMPFS_SIZES.default,
+            timeout: 10000
         },
         {
             language: 'csharp',
             image: 'mcr.microsoft.com/dotnet/sdk:8.0',
             command: 'dotnet --version',
-            tmpfsSize: '100m',
+            tmpfsSize: TMPFS_SIZES.csharp,
             timeout: 15000
         },
         {
@@ -550,8 +434,8 @@ function getWarmupConfigs() {
             image: 'eclipse-temurin:17-jdk-alpine',
             command:
                 'if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version',
-            tmpfsSize: '200m',
-            timeout: 30000
+            tmpfsSize: TMPFS_SIZES.kotlin,
+            timeout: CONFIG.MAX_EXECUTION_TIME * 3
         }
     ];
 }
@@ -592,18 +476,17 @@ async function warmupContainer(config) {
 
 async function warmupAllContainers() {
     if (!(await isDockerAvailable())) {
-        console.warn('⚠️  Docker is not available. Skipping container warmup.');
+        console.warn('[WARMUP] Docker is not available. Skipping container warmup.');
         return;
     }
     const configs = getWarmupConfigs();
-    console.log(`🔥 Warming up ${configs.length} containers...`);
+    console.log(`[WARMUP] Warming up ${configs.length} containers...`);
     const startTime = Date.now();
 
-    const BATCH_SIZE = 4;
     const results = [];
 
-    for (let i = 0; i < configs.length; i += BATCH_SIZE) {
-        const batch = configs.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < configs.length; i += CONFIG.WARMUP_BATCH_SIZE) {
+        const batch = configs.slice(i, i + CONFIG.WARMUP_BATCH_SIZE);
         const batchPromises = batch.map((config) => warmupContainer(config));
         const batchResults = await Promise.all(batchPromises);
         results.push(...batchResults);
@@ -612,21 +495,16 @@ async function warmupAllContainers() {
         const failCount = batchResults.filter((r) => !r.success).length;
         const succeededLanguages = batchResults.filter((r) => r.success).map((r) => r.language);
         const failedLanguages = batchResults.filter((r) => !r.success).map((r) => r.language);
+        const batchNumber = Math.floor(i / CONFIG.WARMUP_BATCH_SIZE) + 1;
 
         if (successCount > 0 && failCount > 0) {
-            console.log(
-                `🔥 Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successCount}/${batch.length} succeeded`
-            );
-            console.log(`   ✅ ${succeededLanguages.join(', ')}`);
-            console.log(`   ❌ ${failedLanguages.join(', ')}`);
+            console.log(`[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded`);
+            console.log(`[WARMUP]   Succeeded: ${succeededLanguages.join(', ')}`);
+            console.log(`[WARMUP]   Failed: ${failedLanguages.join(', ')}`);
         } else if (successCount > 0) {
-            console.log(
-                `🔥 Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successCount}/${batch.length} succeeded (${succeededLanguages.join(', ')})`
-            );
+            console.log(`[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${succeededLanguages.join(', ')})`);
         } else {
-            console.log(
-                `🔥 Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successCount}/${batch.length} succeeded (${failedLanguages.join(', ')})`
-            );
+            console.log(`[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${failedLanguages.join(', ')})`);
         }
     }
 
@@ -637,30 +515,22 @@ async function warmupAllContainers() {
     if (totalFailed > 0) {
         const failedResults = results.filter((r) => !r.success);
         const failedLanguages = failedResults.map((r) => r.language);
-        console.warn(
-            `⚠️  Warmup failed for ${totalFailed} languages: ${failedLanguages.join(', ')}`
-        );
+        console.warn(`[WARMUP] Failed for ${totalFailed} languages: ${failedLanguages.join(', ')}`);
 
         failedResults.forEach((result) => {
             const errorMsg = result.error || 'Unknown error';
-            const maxLength = 200;
-            const displayMsg =
-                errorMsg.length > maxLength ? errorMsg.substring(0, maxLength) + '...' : errorMsg;
-            console.warn(`   ${result.language}: ${displayMsg}`);
+            const displayMsg = errorMsg.length > CONFIG.ERROR_MESSAGE_MAX_LENGTH 
+                ? errorMsg.substring(0, CONFIG.ERROR_MESSAGE_MAX_LENGTH) + '...' 
+                : errorMsg;
+            console.warn(`[WARMUP]   ${result.language}: ${displayMsg}`);
         });
     }
 
     if (totalSuccess > 0) {
-        const avgElapsed =
-            results.filter((r) => r.success).reduce((sum, r) => sum + (r.elapsed || 0), 0) /
-            totalSuccess;
-        console.log(
-            `✨ Warmup completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded (avg: ${avgElapsed.toFixed(0)}ms)`
-        );
+        const avgElapsed = results.filter((r) => r.success).reduce((sum, r) => sum + (r.elapsed || 0), 0) / totalSuccess;
+        console.log(`[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded (avg: ${avgElapsed.toFixed(0)}ms)`);
     } else {
-        console.log(
-            `✨ Warmup completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded`
-        );
+        console.log(`[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded`);
     }
 }
 
@@ -719,15 +589,21 @@ function filterDockerMessages(text) {
     if (!text || typeof text !== 'string') {
         return '';
     }
-    // Strip ANSI escape sequences without using control chars in regex literal (to satisfy eslint)
     const ESC = String.fromCharCode(27);
     const ansiRegex = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
     const withoutAnsi = text.replace(ansiRegex, '');
+    
     return withoutAnsi
         .split('\n')
         .filter((line) => {
             const lower = line.toLowerCase();
-            return !DOCKER_PULL_MESSAGES.some((msg) => lower.includes(msg));
+            if (DOCKER_PULL_MESSAGES.some((msg) => lower.includes(msg))) {
+                return false;
+            }
+            if (DEBUG_PATTERNS.some((pattern) => pattern.test(line.trim()))) {
+                return false;
+            }
+            return true;
         })
         .join('\n');
 }
@@ -744,26 +620,43 @@ function sanitizeError(error) {
     return filtered;
 }
 
-function augmentError(stderr, hasInput) {
-    if (hasInput) {
-        return stderr || '';
+function sanitizeErrorForUser(errorStr) {
+    if (!errorStr || typeof errorStr !== 'string') {
+        return 'An error occurred during execution.';
     }
-    const s = stderr || '';
-    for (const rx of INPUT_ERROR_PATTERNS) {
-        if (rx.test(s)) {
-            const hint =
-                'Hint: The program tried to read from standard input, but no input was provided. Enter input in the box and run again.';
-            return s && s.trim().length > 0 ? `${s.trim()}\n${hint}` : hint;
-        }
+
+    let sanitized = filterDockerMessages(errorStr);
+    
+    sanitized = sanitized.replace(/docker:.*/gi, '');
+    sanitized = sanitized.replace(/Error response from daemon.*/gi, '');
+    
+    sanitized = sanitized.replace(/\/[^\s]+/g, '[file path]');
+    sanitized = sanitized.replace(/[A-Z]:\\[^\s]+/gi, '[file path]');
+    
+    const stackTraceMatch = sanitized.match(/(.*?)(\n\s+at\s+.*)/s);
+    if (stackTraceMatch) {
+        sanitized = stackTraceMatch[1];
     }
-    for (const rx of ENTRYPOINT_ERROR_PATTERNS) {
-        if (rx.test(s)) {
-            const hint =
-                'Hint: Could not find a program entry point. For Python, run a .py script; for C/C++, define main(); for Java, use class Main with public static void main; for Node.js, ensure the module/file exists.';
-            return s && s.trim().length > 0 ? `${s.trim()}\n${hint}` : hint;
-        }
+    
+    const lines = sanitized.split('\n').filter(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return false;
+        if (trimmed.startsWith('[DEBUG]') || trimmed.startsWith('DEBUG:')) return false;
+        if (/^\[file path\]$/.test(trimmed)) return false;
+        return true;
+    });
+    
+    sanitized = lines.slice(0, 10).join('\n').trim();
+    
+    if (sanitized.length > 300) {
+        sanitized = sanitized.substring(0, 300) + '...';
     }
-    return s;
+    
+    if (!sanitized || sanitized.length === 0) {
+        return 'An error occurred during execution.';
+    }
+    
+    return sanitized;
 }
 
 async function cleanupFile(filePath) {
@@ -777,20 +670,28 @@ async function cleanupFile(filePath) {
     }
 }
 
+async function writeInputFile(inputPath, inputText) {
+    if (!validatePath(inputPath)) {
+        throw new Error('Invalid input path');
+    }
+    const resolvedInputPath = path.resolve(inputPath);
+    await fs.writeFile(resolvedInputPath, inputText, 'utf8');
+    return resolvedInputPath;
+}
+
 function getContainerCodePath(language, extension) {
-    if (language === 'java') {
-        return '/tmp/Main.java';
-    }
-    if (language === 'csharp') {
-        return '/tmp/Program.cs';
-    }
-    return `/tmp/code${extension}`;
+    return CONTAINER_CODE_PATHS[language] || `/tmp/code${extension}`;
 }
 
 function convertToDockerPath(filePath) {
     const normalized = normalizePath(filePath);
     if (!normalized) {
         throw new Error('Invalid file path');
+    }
+    if (process.platform === 'win32' && normalized.match(/^[A-Z]:/)) {
+        const drive = normalized[0].toLowerCase();
+        const rest = normalized.substring(2).replace(/\\/g, '/');
+        return `/${drive}${rest}`;
     }
     return normalized;
 }
@@ -812,15 +713,11 @@ function buildDockerArgs(language, hostCodePath, opts = {}) {
     const extension = LANGUAGE_EXTENSIONS[language];
     const containerPath = getContainerCodePath(language, extension);
     const containerBuildDir = language === 'kotlin' ? '/opt/kbuild' : undefined;
-    const command = config.command(containerPath, containerBuildDir);
-    let tmpfsSize;
-    if (language === 'rust' || language === 'kotlin') {
-        tmpfsSize = '200m';
-    } else if (language === 'csharp') {
-        tmpfsSize = '100m';
-    } else {
-        tmpfsSize = '50m';
-    }
+    const containerInputPath = opts.inputPath ? `/input/${path.basename(opts.inputPath)}` : undefined;
+    const command = language === 'kotlin' 
+        ? config.command(containerPath, containerInputPath, containerBuildDir)
+        : config.command(containerPath, containerInputPath);
+    const tmpfsSize = TMPFS_SIZES[language] || TMPFS_SIZES.default;
     const dockerHostPath = convertToDockerPath(hostCodePath);
 
     if (dockerHostPath.includes(' ') || containerPath.includes(' ')) {
@@ -832,18 +729,13 @@ function buildDockerArgs(language, hostCodePath, opts = {}) {
     }
 
     const args = ['run', '--rm'];
-    if (opts.hasInput) {
-        args.push('-i');
-    }
-    args.push(`--memory=${MAX_MEMORY}`);
-    args.push(`--cpus=${language === 'kotlin' ? MAX_CPU_PERCENT_KOTLIN : MAX_CPU_PERCENT}`);
-    // Always disable network for user executions
+    args.push(`--memory=${CONFIG.MAX_MEMORY}`);
+    args.push(`--cpus=${language === 'kotlin' ? CONFIG.MAX_CPU_PERCENT_KOTLIN : CONFIG.MAX_CPU_PERCENT}`);
     args.push('--network=none');
     args.push('--read-only');
     args.push('--tmpfs');
     args.push(`/tmp:rw,exec,nosuid,size=${tmpfsSize},noatime`);
 
-    // Security hardening flags
     args.push('--cap-drop=ALL');
     args.push('--security-opt');
     args.push('no-new-privileges');
@@ -853,8 +745,37 @@ function buildDockerArgs(language, hostCodePath, opts = {}) {
     args.push('--user');
     args.push('1000:1000');
 
+    const hostCodeDir = path.dirname(hostCodePath);
+    const hostFileName = path.basename(hostCodePath);
+    const dockerHostDir = convertToDockerPath(hostCodeDir);
+    const mountedFilePath = `/code/${hostFileName}`;
+
+    if (CONFIG.DEBUG_MODE) {
+        console.log(`[DEBUG] File paths: hostCodePath=${hostCodePath}, hostCodeDir=${hostCodeDir}, hostFileName=${hostFileName}, dockerHostDir=${dockerHostDir}, mountedFilePath=${mountedFilePath}`);
+    }
+
     args.push('-v');
-    args.push(`${dockerHostPath}:${containerPath}:ro`);
+    args.push(`${dockerHostDir}:/code:ro`);
+
+    if (opts.inputPath) {
+        const hostInputDir = path.dirname(opts.inputPath);
+        const dockerInputDir = convertToDockerPath(hostInputDir);
+        if (CONFIG.DEBUG_MODE) {
+            console.log(`[DEBUG] Input file paths: hostInputPath=${opts.inputPath}, dockerInputDir=${dockerInputDir}`);
+        }
+        args.push('-v');
+        args.push(`${dockerInputDir}:/input:ro`);
+    }
+
+    const inputFileCheck = opts.inputPath 
+        ? (!CONFIG.DEBUG_MODE 
+            ? `test -f "/input/${path.basename(opts.inputPath)}" || (echo "ERROR: Input file not found" >&2 && exit 1) && `
+            : `echo "[DEBUG] Checking input file: /input/${path.basename(opts.inputPath)}" >&2 && if [ ! -f "/input/${path.basename(opts.inputPath)}" ]; then echo "ERROR: Input file not found: /input/${path.basename(opts.inputPath)}" >&2; ls -la /input >&2; exit 1; fi && `)
+        : '';
+    const fileCopy = !CONFIG.DEBUG_MODE
+        ? `test -f "${mountedFilePath}" || (echo "ERROR: Source file not found" >&2 && exit 1) && cp "${mountedFilePath}" "${containerPath}" && test -f "${containerPath}" || (echo "ERROR: Copy failed" >&2 && exit 1) && `
+        : `echo "[DEBUG] Checking source file: ${mountedFilePath}" >&2 && if [ ! -f "${mountedFilePath}" ]; then echo "ERROR: Source file not found: ${mountedFilePath}" >&2; ls -la /code >&2; exit 1; fi && echo "[DEBUG] Copying file to ${containerPath}" >&2 && cp "${mountedFilePath}" "${containerPath}" && echo "[DEBUG] Verifying copied file" >&2 && if [ ! -f "${containerPath}" ]; then echo "ERROR: Destination file not found after copy: ${containerPath}" >&2; ls -la /tmp >&2; exit 1; fi && if [ ! -s "${containerPath}" ]; then echo "ERROR: Destination file is empty: ${containerPath}" >&2; exit 1; fi && echo "[DEBUG] File copy successful" >&2 && `;
+    const finalCommand = `${inputFileCheck}${fileCopy}${command}`;
 
     if (language === 'kotlin') {
         const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
@@ -875,7 +796,7 @@ function buildDockerArgs(language, hostCodePath, opts = {}) {
     args.push(config.image);
     args.push('sh');
     args.push('-c');
-    args.push(command);
+    args.push(finalCommand);
 
     return args;
 }
@@ -907,34 +828,37 @@ async function writeCodeFile(codePath, code, language) {
     }
 
     const resolvedCodePath = path.resolve(codePath);
+    let finalCode = code;
+    let fileExtension;
 
-    if (language === 'java') {
-        validateJavaClass(code);
-        const modifiedCode = code.replace(/public\s+class\s+\w+/, 'public class Main');
-        const filePath = resolvedCodePath + '.java';
-        await fs.writeFile(filePath, modifiedCode, 'utf8');
-        return filePath;
-    }
-    if (language === 'csharp') {
-        const filePath = resolvedCodePath + '.cs';
-        await fs.writeFile(filePath, code, 'utf8');
-        return filePath;
-    }
-    if (language === 'r') {
-        const extension = LANGUAGE_EXTENSIONS[language];
-        const fullPath = resolvedCodePath + extension;
-        const plotPattern = /plot\s*\(|ggplot\s*\(|barplot\s*\(|hist\s*\(|boxplot\s*\(|pie\s*\(/i;
-        const hasPlot = plotPattern.test(code);
-        let modifiedCode = code;
-        if (hasPlot) {
-            modifiedCode = `png('/output/plot.png', width=800, height=600, res=100)\n${code}\ndev.off()\n`;
+    switch (language) {
+        case 'java':
+            validateJavaClass(code);
+            finalCode = code.replace(/public\s+class\s+\w+/, 'public class Main');
+            fileExtension = '.java';
+            break;
+
+        case 'csharp':
+            fileExtension = '.cs';
+            break;
+
+        case 'r': {
+            const plotPattern = /plot\s*\(|ggplot\s*\(|barplot\s*\(|hist\s*\(|boxplot\s*\(|pie\s*\(/i;
+            const hasPlot = plotPattern.test(code);
+            if (hasPlot) {
+                finalCode = `png('/output/plot.png', width=800, height=600, res=100)\n${code}\ndev.off()\n`;
+            }
+            fileExtension = LANGUAGE_EXTENSIONS[language];
+            break;
         }
-        await fs.writeFile(fullPath, modifiedCode, 'utf8');
-        return fullPath;
+
+        default:
+            fileExtension = LANGUAGE_EXTENSIONS[language];
+            break;
     }
-    const extension = LANGUAGE_EXTENSIONS[language];
-    const fullPath = resolvedCodePath + extension;
-    await fs.writeFile(fullPath, code, 'utf8');
+
+    const fullPath = resolvedCodePath + fileExtension;
+    await fs.writeFile(fullPath, finalCode, 'utf8');
     return fullPath;
 }
 
@@ -957,16 +881,184 @@ async function findImageFiles(outputDir) {
                         data: `data:${mimeType};base64,${base64}`
                     });
                     await fs.unlink(filePath).catch(() => {});
-                } catch {
-                    // Ignore image read/parse errors
-                }
+                } catch {}
             }
         }
-    } catch {
-        // Ignore directory read errors
-    }
+    } catch {}
 
     return images;
+}
+
+class OutputCollector {
+    constructor(maxBytes) {
+        this.maxBytes = maxBytes;
+        this.stdout = '';
+        this.stderr = '';
+        this.stdoutBytes = 0;
+        this.stderrBytes = 0;
+        this.stdoutTruncated = false;
+        this.stderrTruncated = false;
+    }
+
+    addStdout(data) {
+        if (this.stdoutTruncated) return;
+        const s = data.toString('utf8');
+        const bytes = Buffer.byteLength(s, 'utf8');
+        const remaining = this.maxBytes - this.stdoutBytes;
+        if (remaining <= 0) {
+            this.stdoutTruncated = true;
+            return;
+        }
+        if (bytes <= remaining) {
+            this.stdout += s;
+            this.stdoutBytes += bytes;
+        } else {
+            const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
+            this.stdout += slice;
+            this.stdoutBytes += remaining;
+            this.stdoutTruncated = true;
+        }
+    }
+
+    addStderr(data) {
+        if (this.stderrTruncated) return;
+        const s = data.toString('utf8');
+        const bytes = Buffer.byteLength(s, 'utf8');
+        const remaining = this.maxBytes - this.stderrBytes;
+        if (remaining <= 0) {
+            this.stderrTruncated = true;
+            return;
+        }
+        if (bytes <= remaining) {
+            this.stderr += s;
+            this.stderrBytes += bytes;
+        } else {
+            const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
+            this.stderr += slice;
+            this.stderrBytes += remaining;
+            this.stderrTruncated = true;
+        }
+    }
+
+    getFinalOutput() {
+        let stdout = this.stdout;
+        let stderr = this.stderr;
+        if (this.stdoutTruncated) {
+            stdout += '\n[truncated]';
+        }
+        if (this.stderrTruncated) {
+            stderr += '\n[truncated]';
+        }
+        return { stdout, stderr };
+    }
+}
+
+async function executeDockerProcess(
+    language,
+    fullCodePath,
+    buildOptions,
+    config,
+    startTime,
+    res,
+    sessionOutputDir,
+    fullInputPath,
+    getResponseSent,
+    setResponseSent
+) {
+    const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions);
+    const controller = new AbortController();
+    const abortTimeoutId = setTimeout(() => controller.abort(), config.timeout + CONFIG.TIMEOUT_BUFFER_MS);
+    const dockerProcess = spawn('docker', dockerArgs, {
+        signal: controller.signal,
+        maxBuffer: CONFIG.MAX_BUFFER_SIZE
+    });
+
+    const outputCollector = new OutputCollector(CONFIG.MAX_OUTPUT_BYTES);
+
+    dockerProcess.stdout.on('data', (data) => {
+        outputCollector.addStdout(data);
+    });
+
+    dockerProcess.stderr.on('data', (data) => {
+        outputCollector.addStderr(data);
+    });
+
+    const handleClose = async (code) => {
+        const executionTime = Date.now() - startTime;
+        await cleanupResources(fullCodePath, fullInputPath);
+        
+        if (!getResponseSent()) {
+            const error = code !== 0 ? { code, killed: false, signal: null } : null;
+            const { stdout, stderr } = outputCollector.getFinalOutput();
+            await handleExecutionResult(
+                error,
+                stdout,
+                stderr,
+                executionTime,
+                res,
+                sessionOutputDir
+            );
+            setResponseSent(true);
+        }
+    };
+
+    const handleError = async (error) => {
+        const executionTime = Date.now() - startTime;
+        await cleanupResources(fullCodePath, fullInputPath);
+        
+        if (!getResponseSent()) {
+            const { stdout, stderr } = outputCollector.getFinalOutput();
+            await handleExecutionResult(
+                error,
+                stdout,
+                stderr,
+                executionTime,
+                res,
+                sessionOutputDir
+            );
+            setResponseSent(true);
+        }
+    };
+
+    dockerProcess.on('close', handleClose);
+    dockerProcess.on('error', handleError);
+
+    const processTimeoutId = setTimeout(() => {
+        if (!getResponseSent() && dockerProcess && !dockerProcess.killed) {
+            try {
+                controller.abort();
+                dockerProcess.kill('SIGTERM');
+                const killTimeoutId = setTimeout(() => {
+                    if (dockerProcess && !dockerProcess.killed) {
+                        try {
+                            dockerProcess.kill('SIGKILL');
+                        } catch (killError) {
+                            console.error('[ERROR] Failed to kill Docker process:', killError);
+                        }
+                    }
+                }, CONFIG.SIGKILL_DELAY_MS);
+                dockerProcess.once('close', () => clearTimeout(killTimeoutId));
+                dockerProcess.once('error', () => clearTimeout(killTimeoutId));
+            } catch (killError) {
+                console.error('[ERROR] Failed to send SIGTERM to Docker process:', killError);
+            }
+        }
+    }, config.timeout + CONFIG.TIMEOUT_BUFFER_MS);
+    
+    const cleanupTimeout = () => {
+        clearTimeout(abortTimeoutId);
+        clearTimeout(processTimeoutId);
+    };
+    dockerProcess.once('close', cleanupTimeout);
+    dockerProcess.once('error', cleanupTimeout);
+}
+
+async function cleanupResources(fullCodePath, fullInputPath) {
+    const cleanupPromises = [cleanupFile(fullCodePath)];
+    if (fullInputPath) {
+        cleanupPromises.push(cleanupFile(fullInputPath));
+    }
+    await Promise.allSettled(cleanupPromises);
 }
 
 async function handleExecutionResult(error, stdout, stderr, executionTime, res, outputDir = null) {
@@ -976,19 +1068,26 @@ async function handleExecutionResult(error, stdout, stderr, executionTime, res, 
 
     let images = [];
     if (outputDir) {
-        images = await findImageFiles(outputDir);
         try {
-            await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {});
-        } catch {
-            // Ignore cleanup errors
+            images = await findImageFiles(outputDir);
+        } catch (error) {
+            console.error('[ERROR] Failed to find image files:', error);
+        }
+        try {
+            await fs.rm(outputDir, { recursive: true, force: true });
+        } catch (error) {
+            console.error('[ERROR] Failed to cleanup output directory:', error);
         }
     }
 
     if (error) {
-        const errorMsg =
-            error.killed || error.signal === 'SIGTERM'
-                ? filteredStderr || 'Execution timeout exceeded'
-                : sanitizeError(stderr || error.message);
+        let errorMsg;
+        if (error.killed || error.signal === 'SIGTERM') {
+            errorMsg = 'Execution timeout exceeded.';
+        } else {
+            const sanitized = sanitizeError(stderr || error.message || 'Unknown error');
+            errorMsg = sanitizeErrorForUser(sanitized);
+        }
 
         return res.json({
             output: filteredStdout || '',
@@ -998,9 +1097,31 @@ async function handleExecutionResult(error, stdout, stderr, executionTime, res, 
         });
     }
 
+    let finalOutput = hasStdout ? filteredStdout : '';
+    let finalError = '';
+    
+    if (!hasStdout && filteredStderr) {
+        const isBuildSuccess = /Build succeeded/i.test(filteredStderr);
+        const isBuildFailed = /Build FAILED/i.test(filteredStderr);
+        const isWarningOnly = /warning/i.test(filteredStderr) && !/error/i.test(filteredStderr) && !isBuildFailed;
+        
+        if (isBuildSuccess || isWarningOnly) {
+            finalOutput = '';
+            finalError = '';
+        } else if (isBuildFailed) {
+            finalError = sanitizeErrorForUser(filteredStderr);
+        } else {
+            finalError = sanitizeErrorForUser(filteredStderr);
+        }
+    } else if (hasStdout) {
+        finalError = '';
+    } else {
+        finalError = filteredStderr ? sanitizeErrorForUser(filteredStderr) : '';
+    }
+
     res.json({
-        output: hasStdout ? filteredStdout : '',
-        error: hasStdout ? '' : filteredStderr,
+        output: finalOutput,
+        error: finalError,
         executionTime,
         images
     });
@@ -1025,9 +1146,9 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
         return sendResponse(400, { error: 'Invalid input format' });
     }
 
-    if (code.length > MAX_CODE_LENGTH) {
+    if (code.length > CONFIG.MAX_CODE_LENGTH) {
         return sendResponse(400, {
-            error: `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`
+            error: `Code exceeds maximum length of ${CONFIG.MAX_CODE_LENGTH} characters`
         });
     }
 
@@ -1043,9 +1164,9 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
     } else {
         inputText = String(input);
     }
-    if (inputText.length > MAX_INPUT_LENGTH) {
+    if (inputText.length > CONFIG.MAX_INPUT_LENGTH) {
         return sendResponse(400, {
-            error: `Input exceeds maximum length of ${MAX_INPUT_LENGTH} characters`
+            error: `Input exceeds maximum length of ${CONFIG.MAX_INPUT_LENGTH} characters`
         });
     }
 
@@ -1061,14 +1182,25 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
             throw new Error('Invalid file path generated');
         }
 
+        try {
+            const stats = await fs.stat(fullCodePath);
+            if (!stats.isFile()) {
+                throw new Error(`Path exists but is not a file: ${fullCodePath}`);
+            }
+            if (CONFIG.DEBUG_MODE) {
+                console.log(`[DEBUG] File created successfully: ${fullCodePath}, size: ${stats.size} bytes`);
+            }
+        } catch (error) {
+            console.error(`[ERROR] File verification failed: ${fullCodePath}`, error);
+            throw new Error(`Failed to create or verify code file: ${error.message}`);
+        }
+
         const sessionOutputDir = path.join(outputDir, sessionId);
         await fs.mkdir(sessionOutputDir, { recursive: true });
 
         let buildOptions = {};
         if (language === 'kotlin') {
-            // If Kotlin compiler not available on host, block user execution and trigger background warmup
             if (!kotlinCompilerExistsOnHost()) {
-                // fire-and-forget warmup
                 warmupKotlinOnStart().catch(() => {});
                 await cleanupFile(fullCodePath);
                 await fs.rm(sessionOutputDir, { recursive: true, force: true }).catch(() => {});
@@ -1083,222 +1215,38 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
         }
         buildOptions.hasInput = inputText && inputText.trim().length > 0;
         buildOptions.outputDirHost = sessionOutputDir;
+        
+        let fullInputPath = null;
+        if (buildOptions.hasInput) {
+            const inputPath = path.join(codeDir, `${sessionId}_input`);
+            fullInputPath = await writeInputFile(inputPath, inputText);
+            buildOptions.inputPath = fullInputPath;
+            if (CONFIG.DEBUG_MODE) {
+                console.log(`[DEBUG] Input file created: ${fullInputPath}, size: ${inputText.length} bytes`);
+            }
+        }
+        
         const config = LANGUAGE_CONFIGS[language];
         const startTime = Date.now();
+        let responseSent = false;
 
-        if (buildOptions.hasInput) {
-            const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions);
-            const dockerProcess = spawn('docker', dockerArgs, {
-                timeout: config.timeout + 2000,
-                maxBuffer: 1024 * 1024 * 2
-            });
-
-            let stdout = '';
-            let stderr = '';
-            let stdoutBytes = 0;
-            let stderrBytes = 0;
-            let stdoutTruncated = false;
-            let stderrTruncated = false;
-
-            dockerProcess.stdout.on('data', (data) => {
-                const s = data.toString('utf8');
-                const bytes = Buffer.byteLength(s, 'utf8');
-                const remaining = MAX_OUTPUT_BYTES - stdoutBytes;
-                if (remaining <= 0) {
-                    stdoutTruncated = true;
-                    return;
-                }
-                if (bytes <= remaining) {
-                    stdout += s;
-                    stdoutBytes += bytes;
-                } else {
-                    const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
-                    stdout += slice;
-                    stdoutBytes += remaining;
-                    stdoutTruncated = true;
-                }
-            });
-
-            dockerProcess.stderr.on('data', (data) => {
-                const s = data.toString('utf8');
-                const bytes = Buffer.byteLength(s, 'utf8');
-                const remaining = MAX_OUTPUT_BYTES - stderrBytes;
-                if (remaining <= 0) {
-                    stderrTruncated = true;
-                    return;
-                }
-                if (bytes <= remaining) {
-                    stderr += s;
-                    stderrBytes += bytes;
-                } else {
-                    const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
-                    stderr += slice;
-                    stderrBytes += remaining;
-                    stderrTruncated = true;
-                }
-            });
-
-            dockerProcess.on('close', async (code) => {
-                const executionTime = Date.now() - startTime;
-                await cleanupFile(fullCodePath);
-                if (!responseSent) {
-                    const error = code !== 0 ? { code, killed: false, signal: null } : null;
-                    if (stdoutTruncated) {
-                        stdout += '\n[truncated]';
-                    }
-                    if (stderrTruncated) {
-                        stderr += '\n[truncated]';
-                    }
-                    stderr = augmentError(stderr, buildOptions.hasInput);
-                    await handleExecutionResult(
-                        error,
-                        stdout,
-                        stderr,
-                        executionTime,
-                        res,
-                        sessionOutputDir
-                    );
-                    responseSent = true;
-                }
-            });
-
-            dockerProcess.on('error', async (error) => {
-                const executionTime = Date.now() - startTime;
-                await cleanupFile(fullCodePath);
-                if (!responseSent) {
-                    if (stdoutTruncated) {
-                        stdout += '\n[truncated]';
-                    }
-                    if (stderrTruncated) {
-                        stderr += '\n[truncated]';
-                    }
-                    stderr = augmentError(stderr, buildOptions.hasInput);
-                    await handleExecutionResult(
-                        error,
-                        stdout,
-                        stderr,
-                        executionTime,
-                        res,
-                        sessionOutputDir
-                    );
-                    responseSent = true;
-                }
-            });
-
-            dockerProcess.stdin.write(inputText);
-            dockerProcess.stdin.end();
-
-            setTimeout(() => {
-                if (!responseSent && dockerProcess && !dockerProcess.killed) {
-                    dockerProcess.kill('SIGTERM');
-                }
-            }, config.timeout + 2000);
-        } else {
-            const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions);
-            const dockerProcess = spawn('docker', dockerArgs, {
-                timeout: config.timeout + 2000
-            });
-
-            let stdout = '';
-            let stderr = '';
-            let stdoutBytes = 0;
-            let stderrBytes = 0;
-            let stdoutTruncated = false;
-            let stderrTruncated = false;
-
-            dockerProcess.stdout.on('data', (data) => {
-                const s = data.toString('utf8');
-                const bytes = Buffer.byteLength(s, 'utf8');
-                const remaining = MAX_OUTPUT_BYTES - stdoutBytes;
-                if (remaining <= 0) {
-                    stdoutTruncated = true;
-                    return;
-                }
-                if (bytes <= remaining) {
-                    stdout += s;
-                    stdoutBytes += bytes;
-                } else {
-                    const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
-                    stdout += slice;
-                    stdoutBytes += remaining;
-                    stdoutTruncated = true;
-                }
-            });
-
-            dockerProcess.stderr.on('data', (data) => {
-                const s = data.toString('utf8');
-                const bytes = Buffer.byteLength(s, 'utf8');
-                const remaining = MAX_OUTPUT_BYTES - stderrBytes;
-                if (remaining <= 0) {
-                    stderrTruncated = true;
-                    return;
-                }
-                if (bytes <= remaining) {
-                    stderr += s;
-                    stderrBytes += bytes;
-                } else {
-                    const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
-                    stderr += slice;
-                    stderrBytes += remaining;
-                    stderrTruncated = true;
-                }
-            });
-
-            dockerProcess.on('close', async (code) => {
-                const executionTime = Date.now() - startTime;
-                await cleanupFile(fullCodePath);
-                if (!responseSent) {
-                    const error = code !== 0 ? { code, killed: false, signal: null } : null;
-                    if (stdoutTruncated) {
-                        stdout += '\n[truncated]';
-                    }
-                    if (stderrTruncated) {
-                        stderr += '\n[truncated]';
-                    }
-                    stderr = augmentError(stderr, buildOptions.hasInput);
-                    await handleExecutionResult(
-                        error,
-                        stdout,
-                        stderr,
-                        executionTime,
-                        res,
-                        sessionOutputDir
-                    );
-                    responseSent = true;
-                }
-            });
-
-            dockerProcess.on('error', async (error) => {
-                const executionTime = Date.now() - startTime;
-                await cleanupFile(fullCodePath);
-                if (!responseSent) {
-                    if (stdoutTruncated) {
-                        stdout += '\n[truncated]';
-                    }
-                    if (stderrTruncated) {
-                        stderr += '\n[truncated]';
-                    }
-                    stderr = augmentError(stderr, buildOptions.hasInput);
-                    await handleExecutionResult(
-                        error,
-                        stdout,
-                        stderr,
-                        executionTime,
-                        res,
-                        sessionOutputDir
-                    );
-                    responseSent = true;
-                }
-            });
-
-            setTimeout(() => {
-                if (!responseSent && dockerProcess && !dockerProcess.killed) {
-                    dockerProcess.kill('SIGTERM');
-                }
-            }, config.timeout + 2000);
-        }
+        await executeDockerProcess(
+            language,
+            fullCodePath,
+            buildOptions,
+            config,
+            startTime,
+            res,
+            sessionOutputDir,
+            fullInputPath,
+            () => responseSent,
+            (value) => { responseSent = value; }
+        );
     } catch (error) {
         await cleanupFile(fullCodePath);
+        if (fullInputPath) {
+            await cleanupFile(fullInputPath);
+        }
         const sanitizedError = sanitizeError(error);
         sendResponse(400, { error: sanitizedError });
     }
@@ -1316,25 +1264,25 @@ app.use((err, _, res, _next) => {
 ensureDirectories()
     .then(async () => {
         await warmupKotlinOnStart();
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-            if (ENABLE_PRELOAD) {
+        app.listen(CONFIG.PORT, () => {
+            console.log(`Server running on port ${CONFIG.PORT}`);
+            if (CONFIG.ENABLE_PRELOAD) {
                 preloadDockerImages();
             }
         });
-        if (ENABLE_WARMUP) {
+        if (CONFIG.ENABLE_WARMUP) {
             warmupContainers();
         }
     })
     .catch((e) => {
         console.error('Startup error:', e);
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-            if (ENABLE_PRELOAD) {
+        app.listen(CONFIG.PORT, () => {
+            console.log(`Server running on port ${CONFIG.PORT}`);
+            if (CONFIG.ENABLE_PRELOAD) {
                 preloadDockerImages();
             }
         });
-        if (ENABLE_WARMUP) {
+        if (CONFIG.ENABLE_WARMUP) {
             warmupContainers();
         }
     });

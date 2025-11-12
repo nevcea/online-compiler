@@ -3,11 +3,11 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>온라인 컴파일러</title>
+        <title data-i18n-title="title">온라인 컴파일러</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Courier+Prime:wght@400;700&family=Red+Hat+Mono:wght@300;400;500;600;700&family=PT+Mono&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Courier+Prime:wght@400;700&family=Red+Hat+Mono:wght@300;400;500;600;700&family=PT+Mono&family=Cascadia+Code:wght@300;400;500;600;700&family=Hack:wght@400;700&family=Victor+Mono:wght@300;400;500;600;700&family=Ubuntu+Mono:wght@400;700&family=Anonymous+Pro:wght@400;700&family=Share+Tech+Mono&family=Oxygen+Mono&family=Overpass+Mono:wght@300;400;600;700&family=Nova+Mono&family=Cousine:wght@400;700&display=swap"
             rel="stylesheet"
         />
         <link rel="stylesheet" href="styles.css" />
@@ -21,8 +21,8 @@
             <div class="container header-content">
                 <h1 data-i18n="title">온라인 컴파일러</h1>
                 <div class="header-actions">
-                    <button id="settings-btn" class="settings-toggle" aria-label="설정">
-                        <span class="settings-icon">⚙️</span>
+                    <button id="settings-btn" class="settings-toggle" data-i18n-aria-label="settings" data-i18n-title="settings" data-i18n="settings">
+                        설정
                     </button>
                 </div>
             </div>
@@ -132,9 +132,9 @@
                             <button
                                 id="clear-output-btn"
                                 class="clear-output-btn"
-                                title="Clear Output"
+                                data-i18n-title="clear-output"
                             >
-                                <span>🗑️</span> <span data-i18n="clear-output">지우기</span>
+                                <span data-i18n="clear-output">지우기</span>
                             </button>
                         </div>
                         <div id="output" class="output-content">
@@ -148,8 +148,10 @@
                                 <input
                                     type="text"
                                     id="console-input"
+                                    name="console-input"
                                     class="console-input"
                                     data-i18n-placeholder="console-input-placeholder"
+                                    placeholder="프로그램 입력"
                                     autocomplete="off"
                                 />
                             </div>
@@ -184,17 +186,17 @@
                                         name="interface-language"
                                     >
                                         <span class="fi fi-kr" id="settings-lang-icon"></span>
-                                        <span id="settings-lang-name">한국어</span>
+                                        <span id="settings-lang-name" data-i18n="korean">한국어</span>
                                         <span class="select-arrow">▼</span>
                                     </button>
                                     <div class="lang-select-dropdown" id="settings-lang-dropdown">
                                         <div class="lang-option" data-lang="ko">
                                             <span class="fi fi-kr"></span>
-                                            <span>한국어</span>
+                                            <span data-i18n="korean">한국어</span>
                                         </div>
                                         <div class="lang-option" data-lang="en">
                                             <span class="fi fi-us"></span>
-                                            <span>English</span>
+                                            <span data-i18n="english">English</span>
                                         </div>
                                     </div>
                                 </div>
@@ -212,7 +214,7 @@
                                         id="theme-select-button"
                                         name="theme"
                                     >
-                                        <span id="theme-select-name">다크 모드</span>
+                                        <span id="theme-select-name" data-i18n="dark-theme">다크 모드</span>
                                         <span class="select-arrow">▼</span>
                                     </button>
                                     <div class="theme-select-dropdown" id="theme-select-dropdown">
@@ -424,6 +426,186 @@
                                                 >PT Mono</span
                                             >
                                         </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Cascadia Code', 'Consolas', monospace"
+                                            data-name="Cascadia Code"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Cascadia Code', 'Consolas', monospace;
+                                                "
+                                                >Cascadia Code</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Hack', 'Consolas', monospace"
+                                            data-name="Hack"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family: 'Hack', 'Consolas', monospace;
+                                                "
+                                                >Hack</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Victor Mono', 'Consolas', monospace"
+                                            data-name="Victor Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Victor Mono', 'Consolas', monospace;
+                                                "
+                                                >Victor Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Ubuntu Mono', 'Consolas', monospace"
+                                            data-name="Ubuntu Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Ubuntu Mono', 'Consolas', monospace;
+                                                "
+                                                >Ubuntu Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Anonymous Pro', 'Consolas', monospace"
+                                            data-name="Anonymous Pro"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Anonymous Pro', 'Consolas', monospace;
+                                                "
+                                                >Anonymous Pro</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Share Tech Mono', 'Consolas', monospace"
+                                            data-name="Share Tech Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Share Tech Mono', 'Consolas', monospace;
+                                                "
+                                                >Share Tech Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Oxygen Mono', 'Consolas', monospace"
+                                            data-name="Oxygen Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Oxygen Mono', 'Consolas', monospace;
+                                                "
+                                                >Oxygen Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Overpass Mono', 'Consolas', monospace"
+                                            data-name="Overpass Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Overpass Mono', 'Consolas', monospace;
+                                                "
+                                                >Overpass Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Nova Mono', 'Consolas', monospace"
+                                            data-name="Nova Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Nova Mono', 'Consolas', monospace;
+                                                "
+                                                >Nova Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Cousine', 'Consolas', monospace"
+                                            data-name="Cousine"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family: 'Cousine', 'Consolas', monospace;
+                                                "
+                                                >Cousine</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'SF Mono', 'Monaco', 'Menlo', monospace"
+                                            data-name="SF Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'SF Mono', 'Monaco', 'Menlo', monospace;
+                                                "
+                                                >SF Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Menlo', 'Monaco', 'Consolas', monospace"
+                                            data-name="Menlo"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Menlo', 'Monaco', 'Consolas', monospace;
+                                                "
+                                                >Menlo</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'Liberation Mono', 'Courier New', monospace"
+                                            data-name="Liberation Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'Liberation Mono', 'Courier New', monospace;
+                                                "
+                                                >Liberation Mono</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="font-option"
+                                            data-value="'DejaVu Sans Mono', 'Consolas', monospace"
+                                            data-name="DejaVu Sans Mono"
+                                        >
+                                            <span
+                                                style="
+                                                    font-family:
+                                                        'DejaVu Sans Mono', 'Consolas', monospace;
+                                                "
+                                                >DejaVu Sans Mono</span
+                                            >
+                                        </div>
                                     </div>
                                 </div>
                                 <select id="font-family-select" class="font-select-hidden">
@@ -468,6 +650,48 @@
                                     </option>
                                     <option value="'PT Mono', 'Consolas', monospace">
                                         PT Mono
+                                    </option>
+                                    <option value="'Cascadia Code', 'Consolas', monospace">
+                                        Cascadia Code
+                                    </option>
+                                    <option value="'Hack', 'Consolas', monospace">Hack</option>
+                                    <option value="'Victor Mono', 'Consolas', monospace">
+                                        Victor Mono
+                                    </option>
+                                    <option value="'Ubuntu Mono', 'Consolas', monospace">
+                                        Ubuntu Mono
+                                    </option>
+                                    <option value="'Anonymous Pro', 'Consolas', monospace">
+                                        Anonymous Pro
+                                    </option>
+                                    <option value="'Share Tech Mono', 'Consolas', monospace">
+                                        Share Tech Mono
+                                    </option>
+                                    <option value="'Oxygen Mono', 'Consolas', monospace">
+                                        Oxygen Mono
+                                    </option>
+                                    <option value="'Overpass Mono', 'Consolas', monospace">
+                                        Overpass Mono
+                                    </option>
+                                    <option value="'Nova Mono', 'Consolas', monospace">
+                                        Nova Mono
+                                    </option>
+                                    <option value="'Cousine', 'Consolas', monospace">
+                                        Cousine
+                                    </option>
+                                    <option value="'SF Mono', 'Monaco', 'Menlo', monospace">
+                                        SF Mono
+                                    </option>
+                                    <option value="'Menlo', 'Monaco', 'Consolas', monospace">
+                                        Menlo
+                                    </option>
+                                    <option
+                                        value="'Liberation Mono', 'Courier New', monospace"
+                                    >
+                                        Liberation Mono
+                                    </option>
+                                    <option value="'DejaVu Sans Mono', 'Consolas', monospace">
+                                        DejaVu Sans Mono
                                     </option>
                                 </select>
                             </div>
