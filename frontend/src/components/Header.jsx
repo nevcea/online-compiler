@@ -7,9 +7,9 @@ const Header = () => {
         <header className="bg-[rgba(21,21,32,0.85)] backdrop-blur-2xl border-b border-border-color/50 px-6 py-4 sticky top-0 z-[100] shadow-lg shadow-black/20">
             <div className="container flex justify-between items-center">
                 <div className="flex items-center gap-3 group/logo">
-                    <div className="relative">
-                        <div className="w-3 h-3 rounded-full bg-accent-gradient animate-pulse shadow-lg shadow-accent-primary/50"></div>
-                        <div className="absolute inset-0 w-3 h-3 rounded-full bg-accent-gradient animate-ping opacity-75"></div>
+                    <div className="relative w-3 h-3">
+                        <div className="absolute inset-0 rounded-full bg-accent-gradient animate-pulse-slow shadow-lg shadow-accent-primary/50"></div>
+                        <div className="absolute inset-0 rounded-full bg-accent-gradient animate-ping-slow opacity-75"></div>
                     </div>
                     <h1 className="text-xl font-bold text-text-primary tracking-tight relative">
                         <span className="bg-accent-gradient bg-clip-text text-transparent bg-[length:200%_auto] animate-[shimmer-text_3s_ease-in-out_infinite]">

@@ -13,14 +13,14 @@ const OutputPanel = ({ input, setInput, output, error }) => {
     const hasContent = outputText || error || images.length > 0;
 
     return (
-        <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden min-h-[400px] h-full shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[300px]" style={{ gridArea: 'output' }}>
+        <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-xl border border-border-color rounded-xl overflow-hidden min-h-[400px] h-full shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[300px]" style={{ gridArea: 'output' }}>
             <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
             <div className="bg-gradient-to-r from-bg-tertiary via-bg-tertiary/60 to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex justify-between items-center min-h-[52px] md:px-4 md:min-h-[48px] md:flex-wrap md:gap-2 relative">
                 <div className="flex items-center gap-3 flex-1">
                     <div className="relative">
-                        <div className={`w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-warning animate-pulse shadow-lg shadow-warning/50' : error ? 'bg-error shadow-lg shadow-error/50' : 'bg-success shadow-lg shadow-success/50'}`}></div>
+                        <div className={`w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-warning animate-pulse-slow shadow-lg shadow-warning/50' : error ? 'bg-error shadow-lg shadow-error/50' : 'bg-success shadow-lg shadow-success/50'}`}></div>
                         {isRunning && (
-                            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-warning animate-ping opacity-75"></div>
+                            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-warning animate-ping-slow opacity-75"></div>
                         )}
                     </div>
                     <span className="font-bold text-text-primary text-sm uppercase tracking-widest flex items-center gap-2">
@@ -64,13 +64,13 @@ const OutputPanel = ({ input, setInput, output, error }) => {
                                 <svg className="w-20 h-20 text-text-muted/20 animate-[float_3s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                <div className="absolute inset-0 w-20 h-20 text-accent-primary/10 animate-pulse">
+                                <div className="absolute inset-0 w-20 h-20 text-accent-primary/10 animate-pulse-slow">
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                 </div>
                             </div>
-                            <p className="m-0 p-0 text-text-muted font-mono text-sm leading-[1.7] text-center md:text-[13px]">{t('output-placeholder')}</p>
+                            <p className="m-0 p-0 text-text-muted font-mono text-base leading-[1.7] text-center md:text-[15px]">{t('output-placeholder')}</p>
                         </div>
                     ) : (
                         <>

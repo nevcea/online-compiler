@@ -26,6 +26,7 @@ export default {
       },
       backgroundImage: {
         'accent-gradient': 'var(--accent-gradient)',
+        'accent-gradient-animated': 'var(--accent-gradient-animated)',
         'accent-gradient-subtle': 'var(--accent-gradient-subtle)',
       },
       borderRadius: {

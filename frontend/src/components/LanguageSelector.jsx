@@ -41,27 +41,31 @@ const LanguageSelector = ({ onLanguageChange, pendingChange, onConfirmChange, on
                     <button
                         ref={buttonRef}
                         type="button"
-                        className={`w-full flex items-center gap-3 bg-transparent text-text-primary border-none px-3.5 py-2.5 rounded-sm text-[0.9375rem] font-medium cursor-pointer transition-all duration-200 text-left hover:bg-bg-tertiary focus:outline-none focus:bg-bg-tertiary focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 ${isOpen ? 'bg-bg-tertiary text-accent-primary' : ''}`}
+                        className={`w-full flex items-center justify-between gap-3 bg-bg-tertiary/80 text-text-primary border border-border-color px-4 py-2.5 rounded-lg text-[0.9375rem] font-medium cursor-pointer transition-all duration-200 text-left hover:bg-bg-secondary hover:border-accent-primary/50 focus:outline-none focus:bg-bg-secondary focus:border-accent-primary/70 focus:ring-2 focus:ring-accent-primary/20 ${isOpen ? 'bg-bg-secondary border-accent-primary/50' : ''}`}
                         onClick={() => setIsOpen(!isOpen)}
                     >
-                        <span className="flex items-center justify-center w-6 h-6 flex-shrink-0">
-                            <img
-                                src={LANGUAGE_CONFIG.icons[currentLanguage]}
-                                alt=""
-                                className="w-6 h-6 object-contain block"
-                            />
+                        <span className="flex items-center gap-3">
+                            <span className="flex items-center justify-center w-6 h-6 flex-shrink-0">
+                                <img
+                                    src={LANGUAGE_CONFIG.icons[currentLanguage]}
+                                    alt=""
+                                    className="w-6 h-6 object-contain block"
+                                />
+                            </span>
+                            <span className="flex-1">{LANGUAGE_CONFIG.names[currentLanguage]}</span>
                         </span>
-                        <span className="flex-1">{LANGUAGE_CONFIG.names[currentLanguage]}</span>
-                        <span className={`text-xs transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+                        <span className={`text-text-muted text-xs transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180 text-accent-primary' : ''}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
                     </button>
                     {isOpen && (
                         <div ref={dropdownRef} className="absolute top-[calc(100%+12px)] left-0 right-0 bg-bg-secondary/95 backdrop-blur-2xl border border-border-color rounded-xl shadow-xl z-[10001] max-h-[300px] overflow-y-auto block mt-2 animate-[slideUp_0.2s_ease-out]">
                             {languages.map((lang) => (
                                 <div
                                     key={lang}
-                                    className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-all duration-150 text-text-primary bg-transparent relative select-none hover:bg-bg-tertiary hover:pl-6 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-[-2px] focus-visible:bg-bg-tertiary ${
-                                        lang === currentLanguage ? 'bg-bg-tertiary text-accent-primary font-semibold pl-6' : ''
-                                    }`}
+                                    className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-all duration-150 text-text-primary bg-transparent relative select-none hover:bg-bg-tertiary hover:pl-6 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-[-2px] focus-visible:bg-bg-tertiary ${lang === currentLanguage ? 'bg-bg-tertiary text-accent-primary font-semibold pl-6' : ''}`}
                                     onClick={() => {
                                         onLanguageChange(lang);
                                         setIsOpen(false);

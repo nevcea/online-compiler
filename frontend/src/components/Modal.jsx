@@ -21,19 +21,19 @@ const Modal = ({ title, message, onConfirm, onCancel }) => {
                 <div className="p-6 border-b border-border-color/50 bg-gradient-to-r from-bg-tertiary via-bg-tertiary/60 to-bg-tertiary/50 md:p-5 relative">
                     <h3 className="m-0 text-text-primary text-xl font-bold flex items-center gap-3">
                         <div className="relative">
-                            <div className="w-2 h-2 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
-                            <div className="absolute inset-0 w-2 h-2 rounded-full bg-accent-primary animate-ping opacity-75"></div>
+                            <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
+                            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping-slow opacity-75"></div>
                         </div>
                         {title}
                     </h3>
                 </div>
-                <div className="p-6 flex-1 overflow-y-auto md:p-5">
+                <div className="p-6 flex-1 overflow-y-auto md:p-5 relative z-10">
                     <p className="m-0 mb-4 text-text-primary leading-relaxed text-base">{message}</p>
                     <p className="m-0 text-text-muted text-sm">{t('continue-question')}</p>
                 </div>
                 <div className="p-5 border-t border-border-color/50 bg-bg-tertiary/30 flex gap-3 justify-end md:p-4 md:flex-col relative">
                     <button
-                        className="group/cancel bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md min-w-[100px] m-0 hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full relative overflow-hidden"
+                        className="group/cancel bg-bg-tertiary/80 backdrop-blur-xl text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md min-w-[100px] m-0 hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full relative overflow-hidden"
                         onClick={onCancel}
                     >
                         <span className="relative z-10">{t('cancel')}</span>

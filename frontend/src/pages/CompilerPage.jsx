@@ -142,8 +142,9 @@ const CompilerPage = () => {
             <Header />
             {toast && <Toast message={toast.message} type={toast.type} duration={toast.duration} onClose={hideToast} />}
             <KeyboardShortcuts />
-            <main className="container">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[calc(100vh-180px)] items-start xl:gap-8 xl:min-h-[calc(100vh-200px)]" style={{ gridTemplateRows: 'auto 1fr auto', gridTemplateAreas: "'language language' 'editor output' 'actions actions'" }}>
+            <main className="container pt-8 pb-12 lg:pt-6 lg:pb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[calc(100vh-180px)] items-start xl:gap-8 xl:min-h-[calc(100vh-200px)]"
+                    style={{ gridTemplateRows: 'auto 1fr auto', gridTemplateAreas: "'language language' 'editor output' 'actions actions'" }}>
                     <div className="[grid-area:language] md:[grid-area:language]">
                         <LanguageSelector
                             onLanguageChange={handleLanguageChange}
@@ -152,14 +153,14 @@ const CompilerPage = () => {
                             onCancelChange={() => setPendingLanguageChange(null)}
                         />
                     </div>
-                    <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden h-full min-h-[400px] shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[350px]" style={{ gridArea: 'editor' }}>
+                    <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-xl border border-border-color rounded-xl overflow-hidden h-full min-h-[400px] shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[350px]" style={{ gridArea: 'editor' }}>
                         <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
                         <div className="relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-accent-gradient before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100">
                             <div className="bg-gradient-to-r from-bg-tertiary via-bg-tertiary/60 to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex items-center justify-between min-h-[52px] relative">
                                 <div className="flex items-center gap-3">
                                     <div className="relative">
                                         <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
-                                        <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping opacity-75"></div>
+                                        <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping-slow opacity-75"></div>
                                     </div>
                                     <span className="font-bold text-text-primary text-sm uppercase tracking-widest flex items-center gap-2">
                                         <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +189,7 @@ const CompilerPage = () => {
                             disabled={isRunning}
                             style={{ backgroundSize: '200% auto' }}
                         >
-                            <span className="absolute inset-0 bg-accent-gradient opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[gradient-shift_3s_ease_infinite]"></span>
+                            <span className="absolute inset-0 bg-accent-gradient-animated opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[gradient-shift_3s_ease_infinite]"></span>
                             <span className="relative z-10 flex items-center justify-center gap-2">
                                 {isRunning ? (
                                     <>
@@ -212,7 +213,7 @@ const CompilerPage = () => {
                         </button>
                         <button 
                             type="button" 
-                            className="group/clear bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center relative overflow-hidden"
+                            className="group/clear bg-bg-tertiary/80 backdrop-blur-xl text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center relative overflow-hidden"
                             onClick={handleClear}
                         >
                             <span className="relative z-10 flex items-center justify-center gap-2">
