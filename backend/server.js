@@ -26,6 +26,18 @@ const toolCacheDir = path.join(__dirname, 'tool_cache');
 const kotlinCacheDir = path.join(toolCacheDir, 'kotlin');
 const kotlinBuildsDir = path.join(toolCacheDir, 'kotlin_builds');
 
+async function isDockerAvailable() {
+    return new Promise((resolve) => {
+        exec('docker version', { timeout: 3000 }, (error) => {
+            if (error) {
+                resolve(false);
+                return;
+            }
+            resolve(true);
+        });
+    });
+}
+
 function kotlinCompilerExistsOnHost() {
     try {
         const p = path.join(kotlinCacheDir, 'kotlinc', 'lib', 'kotlin-compiler.jar');
@@ -281,6 +293,10 @@ async function pullDockerImage(image, retries = 2) {
 }
 
 async function preloadDockerImages() {
+    if (!(await isDockerAvailable())) {
+        console.warn('⚠️  Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)');
+        return;
+    }
     console.log('🚀 Starting Docker images preload...');
     const startTime = Date.now();
     const images = Object.values(LANGUAGE_CONFIGS).map((config) => config.image);
@@ -486,6 +502,10 @@ async function warmupContainer(config) {
 }
 
 async function warmupAllContainers() {
+    if (!(await isDockerAvailable())) {
+        console.warn('⚠️  Docker is not available. Skipping container warmup.');
+        return;
+    }
     const configs = getWarmupConfigs();
     console.log(`🔥 Warming up ${configs.length} containers...`);
     const startTime = Date.now();
@@ -555,7 +575,10 @@ function warmupContainers() {
     const frequentLanguages = ['python', 'javascript', 'java', 'cpp'];
     const frequentConfigs = getWarmupConfigs().filter((config) => frequentLanguages.includes(config.language));
 
-    setInterval(() => {
+    setInterval(async () => {
+        if (!(await isDockerAvailable())) {
+            return;
+        }
         const randomConfigs = frequentConfigs.sort(() => Math.random() - 0.5).slice(0, 2);
         randomConfigs.forEach((config) => {
             warmupContainer(config).catch((error) => {
