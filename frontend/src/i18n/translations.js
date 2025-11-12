@@ -10,8 +10,7 @@ export const translations = {
         'language-change-title': '언어 변경 확인',
         'language-change-message': '언어를 변경하면 현재 코드가 기본 템플릿으로 교체됩니다.',
         'clear-confirm-title': '코드 초기화 확인',
-        'clear-confirm-message':
-            '코드를 초기화하면 현재 작성한 코드가 모두 삭제되고 기본 템플릿으로 교체됩니다.',
+        'clear-confirm-message': '코드를 초기화합니다.',
         'continue-question': '계속하시겠습니까?',
         cancel: '취소',
         confirm: '확인',
@@ -59,6 +58,8 @@ export const translations = {
         'execution-completed': '실행 완료',
         'execution-completed-with-errors': '실행 완료 (오류 포함)',
         'code-cleared': '코드가 초기화되었습니다.',
+        'clear-output-confirm-title': '출력 지우기 확인',
+        'clear-output-confirm-message': '실행 결과를 지웁니다.',
         'keyboard-shortcuts': '키보드 단축키',
         'shortcut-run-code': '코드 실행',
         'shortcut-show-help': '도움말 표시',
@@ -81,8 +82,7 @@ export const translations = {
         'language-change-message':
             'Changing the language will replace the current code with the default template.',
         'clear-confirm-title': 'Clear Code Confirmation',
-        'clear-confirm-message':
-            'Clearing the code will delete all currently written code and replace it with the default template.',
+        'clear-confirm-message': 'This will clear the code.',
         'continue-question': 'Do you want to continue?',
         cancel: 'Cancel',
         confirm: 'Confirm',
@@ -130,6 +130,8 @@ export const translations = {
         'execution-completed': 'Execution completed',
         'execution-completed-with-errors': 'Execution completed with errors',
         'code-cleared': 'Code cleared',
+        'clear-output-confirm-title': 'Clear Output Confirmation',
+        'clear-output-confirm-message': 'This will clear the execution result.',
         'keyboard-shortcuts': 'Keyboard Shortcuts',
         'shortcut-run-code': 'Run code',
         'shortcut-show-help': 'Show keyboard shortcuts',

@@ -81,9 +81,9 @@
 }
 
 .clear-output-btn:hover {
-    background-color: var(--bg-secondary);
+    background-color: rgb(255, 100, 100);
     color: var(--text-primary);
-    border-color: var(--border-color);
+    border-color: rgb(255, 100, 100);
 }
 
 .clear-output-btn:active {

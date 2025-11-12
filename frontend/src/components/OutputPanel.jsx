@@ -1,13 +1,24 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { CONFIG } from '../config/constants';
+import Modal from './Modal';
 import './OutputPanel.css';
 
 const OutputPanel = memo(({ input, setInput, output, error }) => {
     const { t, setOutput, executionTime, isRunning } = useApp();
+    const [pendingClearOutput, setPendingClearOutput] = useState(false);
 
     const handleClear = () => {
+        setPendingClearOutput(true);
+    };
+
+    const confirmClear = () => {
         setOutput('');
+        setPendingClearOutput(false);
+    };
+
+    const cancelClear = () => {
+        setPendingClearOutput(false);
     };
 
     const outputText = typeof output === 'object' && output.text ? output.text : output;
@@ -99,6 +110,14 @@ const OutputPanel = memo(({ input, setInput, output, error }) => {
                     />
                 </div>
             </div>
+            {pendingClearOutput && (
+                <Modal
+                    title={t('continue-question')}
+                    message={t('clear-output-confirm-message')}
+                    onConfirm={confirmClear}
+                    onCancel={cancelClear}
+                />
+            )}
         </div>
     );
 });

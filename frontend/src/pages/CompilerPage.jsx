@@ -29,6 +29,7 @@ const CompilerPage = () => {
         t
     } = useApp();
     const [pendingLanguageChange, setPendingLanguageChange] = useState(null);
+    const [pendingClearCode, setPendingClearCode] = useState(false);
     const [isEditorLanguageDropdownOpen, setIsEditorLanguageDropdownOpen] = useState(false);
     const [languageSearchQuery, setLanguageSearchQuery] = useState('');
     const editorLanguageDropdownRef = useRef(null);
@@ -135,12 +136,21 @@ const CompilerPage = () => {
     };
 
     const handleClear = () => {
+        setPendingClearCode(true);
+    };
+
+    const confirmClear = () => {
         const template = LANGUAGE_CONFIG.templates[currentLanguage] || '';
         setCode(template);
         localStorage.removeItem(`code_${currentLanguage}`);
         setOutput('');
         setError('');
         setExecutionTime(null);
+        setPendingClearCode(false);
+    };
+
+    const cancelClear = () => {
+        setPendingClearCode(false);
     };
 
     const handleLanguageChange = (lang) => {
@@ -299,6 +309,14 @@ const CompilerPage = () => {
                     message={t('language-change-message')}
                     onConfirm={confirmLanguageChange}
                     onCancel={() => setPendingLanguageChange(null)}
+                />
+            )}
+            {pendingClearCode && (
+                <Modal
+                    title={t('continue-question')}
+                    message={t('clear-confirm-message')}
+                    onConfirm={confirmClear}
+                    onCancel={cancelClear}
                 />
             )}
         </>

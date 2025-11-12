@@ -92,10 +92,10 @@
 }
 
 .clear-output-btn:hover {
-    background-color: var(--bg-secondary);
+    background-color: rgb(255, 100, 100);
     color: var(--text-primary);
-    border-color: var(--accent-primary);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    border-color: rgb(255, 100, 100);
+    box-shadow: 0 2px 4px rgba(255, 100, 100, 0.4);
     transform: translateY(-1px);
 }
 
