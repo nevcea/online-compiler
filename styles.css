@@ -91,14 +91,13 @@ body {
 }
 
 header {
-    background: var(--bg-secondary);
+    background: rgba(26, 26, 26, 0.85);
+    backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-color);
     padding: 0.75rem 1.5rem;
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(8px);
-    background: rgba(26, 26, 26, 0.8);
 }
 
 header h1 {
@@ -174,15 +173,14 @@ header h1 {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    background: var(--bg-secondary);
+    background: rgba(26, 26, 26, 0.98);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
     z-index: 10001;
     min-width: 140px;
     display: none;
-    backdrop-filter: blur(12px);
-    background: rgba(26, 26, 26, 0.95);
 }
 
 .lang-select-dropdown::-webkit-scrollbar {
@@ -512,7 +510,7 @@ header h1 {
 .settings-select:focus {
     outline: none;
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
 .font-select-wrapper {
@@ -568,7 +566,8 @@ header h1 {
     top: calc(100% + 8px);
     left: 0;
     right: 0;
-    background: var(--bg-secondary);
+    background: rgba(26, 26, 26, 0.98);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
@@ -576,8 +575,6 @@ header h1 {
     display: none;
     max-height: 300px;
     overflow-y: auto;
-    backdrop-filter: blur(12px);
-    background: rgba(26, 26, 26, 0.95);
 }
 
 .font-select-dropdown::-webkit-scrollbar {
@@ -734,14 +731,13 @@ header h1 {
     top: calc(100% + 8px);
     left: 0;
     right: 0;
-    background: var(--bg-secondary);
+    background: rgba(26, 26, 26, 0.98);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
     z-index: 10001;
     display: none;
-    backdrop-filter: blur(12px);
-    background: rgba(26, 26, 26, 0.95);
 }
 
 .theme-select-dropdown::-webkit-scrollbar {
@@ -943,6 +939,8 @@ button {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--shadow-sm);
     letter-spacing: 0.01em;
+    position: relative;
+    overflow: hidden;
 }
 
 button:hover {
@@ -951,8 +949,28 @@ button:hover {
     transform: translateY(-1px);
 }
 
+button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    transition:
+        width 0.3s ease,
+        height 0.3s ease;
+}
+
+button:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
 button:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.98);
     box-shadow: var(--shadow-sm);
 }
 
@@ -1005,7 +1023,7 @@ textarea:focus,
 select:focus {
     outline: none;
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
 input::placeholder,
@@ -1346,7 +1364,8 @@ tr:hover {
     top: calc(100% + 8px);
     left: 0;
     right: 0;
-    background: var(--bg-secondary);
+    background: rgba(26, 26, 26, 0.98);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
@@ -1355,8 +1374,6 @@ tr:hover {
     overflow-y: auto;
     display: none;
     margin-top: 4px;
-    backdrop-filter: blur(12px);
-    background: rgba(26, 26, 26, 0.95);
 }
 
 .custom-select-dropdown.show {
@@ -1879,6 +1896,21 @@ tr:hover {
     min-height: 100px;
     max-height: 500px;
     background-color: var(--bg-primary);
+    position: relative;
+}
+
+.console-output > p.text-muted {
+    margin: 0;
+    padding: 0;
+    color: var(--text-muted);
+    font-family: 'Courier New', Courier, 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    position: relative;
+    top: 0;
+    left: 0;
+    width: auto;
+    height: auto;
 }
 
 .console-output pre {
@@ -1897,6 +1929,10 @@ tr:hover {
         padding: 1rem;
         font-size: 13px;
         max-height: 400px;
+    }
+
+    .console-output > p.text-muted {
+        font-size: 13px;
     }
 }
 
@@ -1935,10 +1971,6 @@ tr:hover {
     margin-bottom: 0;
 }
 
-.console-line.console-output {
-    color: var(--text-primary);
-}
-
 .console-line.console-error {
     color: var(--error-color);
 }
@@ -1962,16 +1994,6 @@ tr:hover {
     height: auto;
     border-radius: 4px;
     box-shadow: 0 2px 8px var(--shadow-color);
-}
-
-.console-prompt-inline {
-    color: var(--accent-primary);
-    font-weight: bold;
-    margin-right: 0.5rem;
-}
-
-.console-input-text {
-    color: var(--accent-primary);
 }
 
 .console-input-wrapper {
@@ -2021,10 +2043,6 @@ tr:hover {
     padding: 0.25rem 0;
     outline: none;
     transition: opacity 0.2s ease;
-}
-
-.console-input:focus {
-    outline: none;
 }
 
 .console-input:focus-visible {
@@ -2152,8 +2170,8 @@ tr:hover {
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
     animation: fadeIn 0.2s ease;
 }
 
@@ -2186,13 +2204,13 @@ tr:hover {
 .modal-content {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
     max-width: 500px;
     width: 90%;
     max-height: 90vh;
     overflow: hidden;
-    animation: slideUp 0.3s ease;
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
 }
