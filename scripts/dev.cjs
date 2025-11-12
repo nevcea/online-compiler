@@ -52,13 +52,13 @@ try {
         console.log('Installing frontend dependencies...');
         execSync('npm install', { stdio: 'inherit', cwd: path.join(rootDir, 'frontend') });
 
-        console.log('[OK] Development environment is ready!');
+		console.log('[OK] Development environment is ready!');
         console.log('Starting frontend dev server...');
         console.log('Frontend: http://localhost:5173');
-        console.log('Backend API: http://localhost:3000');
-        console.log('');
-        console.log('To stop services: docker compose down');
-        console.log('To view logs: docker compose logs -f');
+		console.log('Backend API: http://localhost:3000');
+		console.log('');
+		console.log('To stop services: docker compose down');
+		console.log('To view logs: docker compose logs -f');
         console.log('To start frontend manually: cd frontend && npm run dev');
         
         const { spawn } = require('child_process');

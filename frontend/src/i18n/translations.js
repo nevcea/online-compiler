@@ -35,7 +35,7 @@ export const translations = {
         'clear-code': '코드 초기화',
         'toggle-comment': '주석 토글',
         'settings-title': '설정',
-        back: '← 뒤로',
+        back: '뒤로',
         'language-settings': '언어 설정',
         'interface-language': '인터페이스 언어:',
         korean: '한국어',
@@ -65,7 +65,9 @@ export const translations = {
         'shortcut-clear': '코드 초기화',
         'shortcut-close-modal': '모달 닫기',
         close: '닫기',
-        'to-run': '실행'
+        'to-run': '실행',
+        'search-language': '언어 검색...',
+        'search-font': '폰트 검색...'
     },
     en: {
         title: 'Online Compiler',
@@ -104,7 +106,7 @@ export const translations = {
         'clear-code': 'Clear Code',
         'toggle-comment': 'Toggle Comment',
         'settings-title': 'Settings',
-        back: '← Back',
+        back: 'Back',
         'language-settings': 'Language Settings',
         'interface-language': 'Interface Language:',
         korean: 'Korean',
@@ -134,7 +136,9 @@ export const translations = {
         'shortcut-clear': 'Clear code',
         'shortcut-close-modal': 'Close modal/dropdown',
         close: 'Close',
-        'to-run': 'to run'
+        'to-run': 'to run',
+        'search-language': 'Search language...',
+        'search-font': 'Search font...'
     }
 };
 

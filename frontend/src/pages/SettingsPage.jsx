@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import Header from '../components/Header';
 import { FONT_CONFIG } from '../config/constants';
+import './SettingsPage.css';
 
 const SettingsPage = () => {
     const {
@@ -15,136 +17,398 @@ const SettingsPage = () => {
         setCurrentPage,
         t
     } = useApp();
+    const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+    const [fontSearchQuery, setFontSearchQuery] = useState('');
+    const fontDropdownRef = useRef(null);
+    const fontButtonRef = useRef(null);
+    const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+    const themeDropdownRef = useRef(null);
+    const themeButtonRef = useRef(null);
+    const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+    const languageDropdownRef = useRef(null);
+    const languageButtonRef = useRef(null);
+    const [fontSizeInput, setFontSizeInput] = useState(fontSize.toString());
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                fontDropdownRef.current &&
+                !fontDropdownRef.current.contains(event.target) &&
+                fontButtonRef.current &&
+                !fontButtonRef.current.contains(event.target)
+            ) {
+                setIsFontDropdownOpen(false);
+                setFontSearchQuery('');
+            }
+            if (
+                themeDropdownRef.current &&
+                !themeDropdownRef.current.contains(event.target) &&
+                themeButtonRef.current &&
+                !themeButtonRef.current.contains(event.target)
+            ) {
+                setIsThemeDropdownOpen(false);
+            }
+            if (
+                languageDropdownRef.current &&
+                !languageDropdownRef.current.contains(event.target) &&
+                languageButtonRef.current &&
+                !languageButtonRef.current.contains(event.target)
+            ) {
+                setIsLanguageDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (!isFontDropdownOpen) {
+            setFontSearchQuery('');
+        }
+    }, [isFontDropdownOpen]);
+
+    useEffect(() => {
+        setFontSizeInput(fontSize.toString());
+    }, [fontSize]);
 
     return (
         <>
             <Header />
-            <main className="container pt-8 pb-12 lg:pt-6 lg:pb-10">
-                <div className="max-w-[900px] mx-auto">
-                           <div className="flex justify-between items-center mb-10 pb-5 border-b border-border-color md:flex-col md:items-start md:gap-4 md:mb-8">
-                               <h2 className="text-2xl font-semibold mb-0 text-text-primary tracking-tight md:text-xl flex items-center gap-3">
-                                   <svg className="w-6 h-6 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                   </svg>
-                                   {t('settings-title')}
-                               </h2>
-                               <button
-                                   className="group/back bg-transparent text-text-secondary border border-border-color px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-300 flex items-center gap-2 hover:bg-bg-tertiary hover:border-accent-primary/50 hover:text-accent-primary hover:shadow-md hover:-translate-x-1 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 relative overflow-hidden"
-                                   onClick={() => setCurrentPage('compiler')}
-                               >
-                                   <svg className="w-4 h-4 transition-transform duration-300 group-hover/back:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                   </svg>
-                                   <span className="relative z-10">{t('back')}</span>
-                                   <span className="absolute inset-0 bg-accent-gradient opacity-0 group-hover/back:opacity-5 transition-opacity duration-300"></span>
-                               </button>
-                           </div>
-                           <div className="flex flex-col gap-6">
-                               <div className="bg-bg-secondary/80 backdrop-blur-xl border border-border-color rounded-xl p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-1 md:p-6 relative group/section overflow-hidden">
-                                   <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover/section:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
-                                   <h3 className="text-lg font-bold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-4 border-b border-border-color/50 md:text-base md:mb-5 relative z-10">
-                                       <div className="relative">
-                                           <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
-                                           <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping-slow opacity-75"></div>
-                                       </div>
-                                       {t('language-settings')}
-                                   </h3>
-                                   <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6 relative z-10">
-                                       <label className="text-[0.9375rem] font-medium text-text-primary select-none flex items-center gap-2">
-                                           <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                                           </svg>
-                                           {t('interface-language')}
-                                       </label>
-                                       <select
-                                           className="bg-bg-tertiary/80 backdrop-blur-xl text-text-primary border border-border-color px-4 py-3 rounded-xl text-sm cursor-pointer transition-all duration-300 w-full max-w-[400px] hover:border-accent-primary/50 hover:shadow-md hover:shadow-accent-primary/10 focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 md:max-w-full"
-                                           value={currentLang}
-                                           onChange={(e) => setCurrentLang(e.target.value)}
-                                       >
-                                           <option value="ko">{t('korean')}</option>
-                                           <option value="en">{t('english')}</option>
-                                       </select>
-                                   </div>
-                               </div>
-                               <div className="bg-bg-secondary/80 backdrop-blur-xl border border-border-color rounded-xl p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-1 md:p-6 relative group/section overflow-hidden">
-                                   <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover/section:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
-                                   <h3 className="text-lg font-bold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-4 border-b border-border-color/50 md:text-base md:mb-5 relative z-10">
-                                       <div className="relative">
-                                           <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
-                                           <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping-slow opacity-75"></div>
-                                       </div>
-                                       {t('theme-settings')}
-                                   </h3>
-                                   <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6 relative z-10">
-                                       <label className="text-[0.9375rem] font-medium text-text-primary select-none flex items-center gap-2">
-                                           <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                                           </svg>
-                                           {t('theme')}
-                                       </label>
-                                       <select
-                                           className="bg-bg-tertiary/80 backdrop-blur-xl text-text-primary border border-border-color px-4 py-3 rounded-xl text-sm cursor-pointer transition-all duration-300 w-full max-w-[400px] hover:border-accent-primary/50 hover:shadow-md hover:shadow-accent-primary/10 focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 md:max-w-full"
-                                           value={theme}
-                                           onChange={(e) => setTheme(e.target.value)}
-                                       >
-                                           <option value="system">{t('system-theme')}</option>
-                                           <option value="dark">{t('dark-theme')}</option>
-                                           <option value="light">{t('light-theme')}</option>
-                                       </select>
-                                   </div>
-                               </div>
-                               <div className="bg-bg-secondary/80 backdrop-blur-xl border border-border-color rounded-xl p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-1 md:p-6 relative group/section overflow-hidden">
-                                   <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover/section:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
-                                   <h3 className="text-lg font-bold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-4 border-b border-border-color/50 md:text-base md:mb-5 relative z-10">
-                                       <div className="relative">
-                                           <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
-                                           <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping-slow opacity-75"></div>
-                                       </div>
-                                       {t('editor-settings')}
-                                   </h3>
-                                   <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6 relative z-10">
-                                       <label className="text-[0.9375rem] font-medium text-text-primary select-none flex items-center gap-2">
-                                           <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                                           </svg>
-                                           {t('font-family')}
-                                       </label>
-                                       <select
-                                           className="bg-bg-tertiary/80 backdrop-blur-xl text-text-primary border border-border-color px-4 py-3 rounded-xl text-sm cursor-pointer transition-all duration-300 w-full max-w-[400px] hover:border-accent-primary/50 hover:shadow-md hover:shadow-accent-primary/10 focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 md:max-w-full"
-                                           value={fontFamily}
-                                           onChange={(e) => setFontFamily(e.target.value)}
-                                       >
-                                           {Object.entries(FONT_CONFIG.families).map(([value, name]) => (
-                                               <option key={value} value={value}>
-                                                   {name}
-                                               </option>
-                                           ))}
-                                       </select>
-                                   </div>
-                                   <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6 relative z-10">
-                                       <label className="text-[0.9375rem] font-medium text-text-primary select-none flex items-center gap-2">
-                                           <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                                           </svg>
-                                           {t('font-size')}
-                                       </label>
-                                       <div className="flex items-center gap-4 max-w-[400px] md:max-w-full relative z-10">
-                                           <input
-                                               type="range"
-                                               min="10"
-                                               max="24"
-                                               value={fontSize}
-                                               onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
-                                               step="1"
-                                               className="flex-1 h-1.5 bg-bg-tertiary rounded-full outline-none appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:bg-accent-primary [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:duration-200 hover:[&::-webkit-slider-thumb]:scale-120 hover:[&::-webkit-slider-thumb]:bg-accent-secondary [&::-moz-range-thumb]:w-[18px] [&::-moz-range-thumb]:h-[18px] [&::-moz-range-thumb]:bg-accent-primary [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:transition-all [&::-moz-range-thumb]:duration-200 hover:[&::-moz-range-thumb]:scale-120 hover:[&::-moz-range-thumb]:bg-accent-secondary"
-                                           />
-                                           <span className="min-w-[50px] text-right text-base text-text-primary font-medium">{fontSize}px</span>
-                                       </div>
-                                   </div>
-                               </div>
-                           </div>
-                       </div>
+            <main className="container">
+                <div className="settings-layout">
+                    <div className="settings-header">
+                        <h2>{t('settings-title')}</h2>
+                        <button
+                            className="back-button"
+                            onClick={() => setCurrentPage('compiler')}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                            <span>{t('back')}</span>
+                        </button>
+                    </div>
+                    <div className="settings-content">
+                        <div className="settings-section">
+                            <h3>{t('language-settings')}</h3>
+                            <div className="settings-item">
+                                <label>{t('interface-language')}</label>
+                                <div className="language-select-wrapper">
+                                    <button
+                                        ref={languageButtonRef}
+                                        type="button"
+                                        className={`language-select-button ${isLanguageDropdownOpen ? 'active' : ''}`}
+                                        onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                                    >
+                                        <div className="option-icon">
+                                            {currentLang === 'ko' ? (
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                                    <circle cx="12" cy="10" r="3"></circle>
+                                                </svg>
+                                            ) : (
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                                    <circle cx="12" cy="10" r="3"></circle>
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span>
+                                            {currentLang === 'ko' && t('korean')}
+                                            {currentLang === 'en' && t('english')}
+                                        </span>
+                                        <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                    </button>
+                                    <div className={`language-select-dropdown ${isLanguageDropdownOpen ? 'show' : ''}`} ref={languageDropdownRef}>
+                                        <div
+                                            className={`language-option ${currentLang === 'ko' ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                setCurrentLang('ko');
+                                                setIsLanguageDropdownOpen(false);
+                                            }}
+                                        >
+                                            <div className="option-icon">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                                    <circle cx="12" cy="10" r="3"></circle>
+                                                </svg>
+                                            </div>
+                                            <span>{t('korean')}</span>
+                                        </div>
+                                        <div
+                                            className={`language-option ${currentLang === 'en' ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                setCurrentLang('en');
+                                                setIsLanguageDropdownOpen(false);
+                                            }}
+                                        >
+                                            <div className="option-icon">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                                    <circle cx="12" cy="10" r="3"></circle>
+                                                </svg>
+                                            </div>
+                                            <span>{t('english')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="settings-section">
+                            <h3>{t('theme-settings')}</h3>
+                            <div className="settings-item">
+                                <label>{t('theme')}</label>
+                                <div className="theme-select-wrapper">
+                                    <button
+                                        ref={themeButtonRef}
+                                        type="button"
+                                        className={`theme-select-button ${isThemeDropdownOpen ? 'active' : ''}`}
+                                        onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                                    >
+                                        <div className="option-icon">
+                                            {theme === 'system' ? (
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                                </svg>
+                                            ) : theme === 'dark' ? (
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                                </svg>
+                                            ) : (
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="12" cy="12" r="5"></circle>
+                                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span>
+                                            {theme === 'system' && t('system-theme')}
+                                            {theme === 'dark' && t('dark-theme')}
+                                            {theme === 'light' && t('light-theme')}
+                                        </span>
+                                        <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                    </button>
+                                    <div className={`theme-select-dropdown ${isThemeDropdownOpen ? 'show' : ''}`} ref={themeDropdownRef}>
+                                        <div
+                                            className={`theme-option ${theme === 'system' ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                setTheme('system');
+                                                setIsThemeDropdownOpen(false);
+                                            }}
+                                        >
+                                            <div className="option-icon">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                                </svg>
+                                            </div>
+                                            <span>{t('system-theme')}</span>
+                                        </div>
+                                        <div
+                                            className={`theme-option ${theme === 'dark' ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                setTheme('dark');
+                                                setIsThemeDropdownOpen(false);
+                                            }}
+                                        >
+                                            <div className="option-icon">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                                </svg>
+                                            </div>
+                                            <span>{t('dark-theme')}</span>
+                                        </div>
+                                        <div
+                                            className={`theme-option ${theme === 'light' ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                setTheme('light');
+                                                setIsThemeDropdownOpen(false);
+                                            }}
+                                        >
+                                            <div className="option-icon">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="12" cy="12" r="5"></circle>
+                                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                                </svg>
+                                            </div>
+                                            <span>{t('light-theme')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="settings-section">
+                            <h3>{t('editor-settings')}</h3>
+                            <div className="settings-item">
+                                <label>{t('font-family')}</label>
+                                <div className="font-select-wrapper">
+                                    <button
+                                        ref={fontButtonRef}
+                                        type="button"
+                                        className={`font-select-button ${isFontDropdownOpen ? 'active' : ''}`}
+                                        onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+                                        style={{ fontFamily: fontFamily }}
+                                    >
+                                        <div className="option-icon">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                                <line x1="9" y1="20" x2="15" y2="20"></line>
+                                                <line x1="12" y1="4" x2="12" y2="20"></line>
+                                            </svg>
+                                        </div>
+                                        <span>{FONT_CONFIG.families[fontFamily] || fontFamily}</span>
+                                        <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                    </button>
+                                    <div className={`font-select-dropdown ${isFontDropdownOpen ? 'show' : ''}`} ref={fontDropdownRef}>
+                                        <div className="font-select-search">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="11" cy="11" r="8"></circle>
+                                                <path d="m21 21-4.35-4.35"></path>
+                                            </svg>
+                                            <input
+                                                type="text"
+                                                className="font-select-search-input"
+                                                placeholder={t('search-font') || '폰트 검색...'}
+                                                value={fontSearchQuery}
+                                                onChange={(e) => setFontSearchQuery(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            {fontSearchQuery && (
+                                                <button
+                                                    type="button"
+                                                    className="font-select-search-clear"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setFontSearchQuery('');
+                                                    }}
+                                                >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="font-select-options">
+                                            {Object.entries(FONT_CONFIG.families)
+                                                .filter(([value, name]) => {
+                                                    if (!fontSearchQuery) return true;
+                                                    const searchLower = fontSearchQuery.toLowerCase();
+                                                    const fontName = name.toLowerCase();
+                                                    return fontName.includes(searchLower) || value.toLowerCase().includes(searchLower);
+                                                })
+                                                .map(([value, name]) => (
+                                                    <div
+                                                        key={value}
+                                                        className={`font-option ${value === fontFamily ? 'selected' : ''}`}
+                                                        onClick={() => {
+                                                            setFontFamily(value);
+                                                            setIsFontDropdownOpen(false);
+                                                            setFontSearchQuery('');
+                                                        }}
+                                                        style={{ fontFamily: value }}
+                                                    >
+                                                        <div className="option-icon">
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                                                <line x1="9" y1="20" x2="15" y2="20"></line>
+                                                                <line x1="12" y1="4" x2="12" y2="20"></line>
+                                                            </svg>
+                                                        </div>
+                                                        <span>{name}</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="settings-item">
+                                <label>{t('font-size')}</label>
+                                <div className="font-size-input-wrapper">
+                                    <div className="option-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                            <line x1="9" y1="20" x2="15" y2="20"></line>
+                                            <line x1="12" y1="4" x2="12" y2="20"></line>
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={fontSizeInput}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value === '' || /^\d+$/.test(value)) {
+                                                setFontSizeInput(value);
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                const value = parseInt(fontSizeInput, 10);
+                                                if (!isNaN(value) && value >= 8 && value <= 48) {
+                                                    setFontSize(value);
+                                                } else if (isNaN(value) || value < 8) {
+                                                    setFontSize(8);
+                                                } else if (value > 48) {
+                                                    setFontSize(48);
+                                                }
+                                                e.target.blur();
+                                            } else if (e.key === 'ArrowUp') {
+                                                e.preventDefault();
+                                                const currentValue = parseInt(fontSizeInput, 10) || fontSize;
+                                                const newValue = Math.min(currentValue + 1, 48);
+                                                setFontSize(newValue);
+                                            } else if (e.key === 'ArrowDown') {
+                                                e.preventDefault();
+                                                const currentValue = parseInt(fontSizeInput, 10) || fontSize;
+                                                const newValue = Math.max(currentValue - 1, 8);
+                                                setFontSize(newValue);
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            const value = parseInt(fontSizeInput, 10);
+                                            if (isNaN(value) || value < 8) {
+                                                setFontSize(8);
+                                            } else if (value > 48) {
+                                                setFontSize(48);
+                                            } else {
+                                                setFontSize(value);
+                                            }
+                                        }}
+                                        className="font-size-input"
+                                        placeholder="14"
+                                    />
+                                    <span className="font-size-unit">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </main>
         </>
     );

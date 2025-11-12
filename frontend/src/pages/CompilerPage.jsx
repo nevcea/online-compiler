@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import CodeEditor from '../components/CodeEditor';
-import LanguageSelector from '../components/LanguageSelector';
 import OutputPanel from '../components/OutputPanel';
 import Header from '../components/Header';
-import Toast from '../components/Toast';
 import KeyboardShortcuts from '../components/KeyboardShortcuts';
+import Modal from '../components/Modal';
 import { executeCode as apiExecuteCode } from '../services/api';
 import { CONFIG, LANGUAGE_CONFIG } from '../config/constants';
 import { formatOutput, formatError } from '../utils/outputFormatter';
+import './CompilerPage.css';
 
 const CompilerPage = () => {
     const {
@@ -26,19 +26,24 @@ const CompilerPage = () => {
         setCurrentLanguage,
         setExecutionTime,
         showToast,
-        toast,
-        hideToast,
         t
     } = useApp();
     const [pendingLanguageChange, setPendingLanguageChange] = useState(null);
+    const [isEditorLanguageDropdownOpen, setIsEditorLanguageDropdownOpen] = useState(false);
+    const [languageSearchQuery, setLanguageSearchQuery] = useState('');
+    const editorLanguageDropdownRef = useRef(null);
+    const editorLanguageButtonRef = useRef(null);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isRunning) {
+            const target = e.target;
+            const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+            
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isRunning && !isInputFocused) {
                 e.preventDefault();
                 handleRun();
             }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k' && !isInputFocused) {
                 e.preventDefault();
                 handleClear();
             }
@@ -48,9 +53,32 @@ const CompilerPage = () => {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [code, isRunning]);
 
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                editorLanguageDropdownRef.current &&
+                !editorLanguageDropdownRef.current.contains(event.target) &&
+                editorLanguageButtonRef.current &&
+                !editorLanguageButtonRef.current.contains(event.target)
+            ) {
+                setIsEditorLanguageDropdownOpen(false);
+                setLanguageSearchQuery('');
+            }
+        };
+
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (!isEditorLanguageDropdownOpen) {
+            setLanguageSearchQuery('');
+        }
+    }, [isEditorLanguageDropdownOpen]);
+
+
     const handleRun = async () => {
         if (!code || !code.trim()) {
-            showToast(t('no-code-error'), 'warning');
             return;
         }
 
@@ -78,16 +106,11 @@ const CompilerPage = () => {
                 setOutput(formattedOutput);
             }
             setError(formattedError);
-
-            if (formattedError) {
-                showToast(t('execution-completed-with-errors') || 'Execution completed with errors', 'warning');
-            } else {
-                showToast(t('execution-completed') || `Execution completed in ${executionTimeMs}ms`, 'success');
-            }
         } catch (err) {
             const endTime = Date.now();
             setExecutionTime(Date.now() - startTime);
             let userMessage = t('connection-error');
+            let errorType = 'error';
             if (err.message) {
                 const msg = err.message.toLowerCase();
                 if (msg.includes('failed to fetch') || msg.includes('network')) {
@@ -105,8 +128,7 @@ const CompilerPage = () => {
                     }
                 }
             }
-            setError(userMessage);
-            showToast(userMessage, 'error');
+            showToast(userMessage, errorType, 5000);
         } finally {
             setIsRunning(false);
         }
@@ -119,15 +141,13 @@ const CompilerPage = () => {
         setOutput('');
         setError('');
         setExecutionTime(null);
-        showToast(t('code-cleared') || 'Code cleared', 'info');
     };
 
     const handleLanguageChange = (lang) => {
-        if (code && code.trim() && code !== LANGUAGE_CONFIG.templates[currentLanguage]) {
-            setPendingLanguageChange(lang);
-        } else {
-            setCurrentLanguage(lang);
+        if (lang === currentLanguage) {
+            return;
         }
+        setPendingLanguageChange(lang);
     };
 
     const confirmLanguageChange = () => {
@@ -140,96 +160,147 @@ const CompilerPage = () => {
     return (
         <>
             <Header />
-            {toast && <Toast message={toast.message} type={toast.type} duration={toast.duration} onClose={hideToast} />}
             <KeyboardShortcuts />
-            <main className="container pt-8 pb-12 lg:pt-6 lg:pb-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[calc(100vh-180px)] items-start xl:gap-8 xl:min-h-[calc(100vh-200px)]"
-                    style={{ gridTemplateRows: 'auto 1fr auto', gridTemplateAreas: "'language language' 'editor output' 'actions actions'" }}>
-                    <div className="[grid-area:language] md:[grid-area:language]">
-                        <LanguageSelector
-                            onLanguageChange={handleLanguageChange}
-                            pendingChange={pendingLanguageChange}
-                            onConfirmChange={confirmLanguageChange}
-                            onCancelChange={() => setPendingLanguageChange(null)}
-                        />
-                    </div>
-                    <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-xl border border-border-color rounded-xl overflow-hidden h-full min-h-[400px] shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[350px]" style={{ gridArea: 'editor' }}>
-                        <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
-                        <div className="relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-accent-gradient before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100">
-                            <div className="bg-gradient-to-r from-bg-tertiary via-bg-tertiary/60 to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex items-center justify-between min-h-[52px] relative">
-                                <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
-                                        <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping-slow opacity-75"></div>
-                                    </div>
-                                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                                        </svg>
-                                        {t('code-editor')}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-text-muted">
-                                    <kbd className="px-2.5 py-1 bg-bg-secondary/80 border border-border-color/50 rounded-md text-[10px] font-medium shadow-sm">Ctrl</kbd>
-                                    <span className="text-text-muted/60">+</span>
-                                    <kbd className="px-2.5 py-1 bg-bg-secondary/80 border border-border-color/50 rounded-md text-[10px] font-medium shadow-sm">Enter</kbd>
-                                    <span className="ml-1.5 text-text-muted/70">{t('to-run') || 'to run'}</span>
-                                </div>
+            <main className="container">
+                <div className="compiler-layout">
+                    <div className="editor-section">
+                        <div className="editor-header">
+                            <div className="editor-title">
+                                {t('code-editor')}
                             </div>
-                            <div className="flex relative min-h-[350px] flex-1 md:min-h-[300px]">
-                                <CodeEditor onRun={handleRun} />
+                            <div className="editor-header-actions">
+                                <div className="editor-language-selector">
+                                    <button
+                                        ref={editorLanguageButtonRef}
+                                        type="button"
+                                        className={`editor-language-button ${isEditorLanguageDropdownOpen ? 'active' : ''} ${pendingLanguageChange ? 'pending' : ''}`}
+                                        onClick={() => setIsEditorLanguageDropdownOpen(!isEditorLanguageDropdownOpen)}
+                                    >
+                                        <img
+                                            src={LANGUAGE_CONFIG.icons[currentLanguage]}
+                                            alt=""
+                                            className="editor-language-icon"
+                                        />
+                                        <span className="editor-language-name">{LANGUAGE_CONFIG.names[currentLanguage]}</span>
+                                        <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                    </button>
+                                    <div 
+                                        ref={editorLanguageDropdownRef}
+                                        className={`editor-language-dropdown ${isEditorLanguageDropdownOpen ? 'show' : ''}`}
+                                    >
+                                        <div className="editor-language-search">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="11" cy="11" r="8"></circle>
+                                                <path d="m21 21-4.35-4.35"></path>
+                                            </svg>
+                                            <input
+                                                type="text"
+                                                className="editor-language-search-input"
+                                                placeholder={t('search-language') || '언어 검색...'}
+                                                value={languageSearchQuery}
+                                                onChange={(e) => setLanguageSearchQuery(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            {languageSearchQuery && (
+                                                <button
+                                                    type="button"
+                                                    className="editor-language-search-clear"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setLanguageSearchQuery('');
+                                                    }}
+                                                >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="editor-language-options">
+                                            {Object.keys(LANGUAGE_CONFIG.names)
+                                                .filter((lang) => {
+                                                    if (!languageSearchQuery) return true;
+                                                    const searchLower = languageSearchQuery.toLowerCase();
+                                                    const langName = LANGUAGE_CONFIG.names[lang].toLowerCase();
+                                                    return langName.includes(searchLower) || lang.toLowerCase().includes(searchLower);
+                                                })
+                                                .map((lang) => (
+                                                    <div
+                                                        key={lang}
+                                                        className={`editor-language-option ${lang === currentLanguage ? 'selected' : ''}`}
+                                                        onClick={() => {
+                                                            handleLanguageChange(lang);
+                                                            setIsEditorLanguageDropdownOpen(false);
+                                                            setLanguageSearchQuery('');
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={LANGUAGE_CONFIG.icons[lang]}
+                                                            alt=""
+                                                            className="editor-language-icon"
+                                                        />
+                                                        <span className="editor-language-name">{LANGUAGE_CONFIG.names[lang]}</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="flex gap-4 justify-end items-center py-6 flex-wrap md:flex-col md:w-full md:gap-3 md:py-4" style={{ gridArea: 'actions' }}>
-                        <button
-                            type="button"
-                            className="group relative bg-accent-gradient text-white border-none px-8 py-3.5 rounded-xl text-sm font-bold cursor-pointer transition-all duration-300 shadow-lg shadow-accent-primary/30 min-w-[120px] hover:shadow-xl hover:shadow-accent-primary/50 hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none md:w-full md:justify-center overflow-hidden"
-                            onClick={handleRun}
-                            disabled={isRunning}
-                            style={{ backgroundSize: '200% auto' }}
-                        >
-                            <span className="absolute inset-0 bg-accent-gradient-animated opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[gradient-shift_3s_ease_infinite]"></span>
-                            <span className="relative z-10 flex items-center justify-center gap-2">
+                        <div className="editor-wrapper">
+                            <CodeEditor onRun={handleRun} />
+                        </div>
+                        <div className="action-buttons">
+                            <button
+                                type="button"
+                                className="run-button"
+                                onClick={handleRun}
+                                disabled={isRunning}
+                            >
                                 {isRunning ? (
                                     <>
-                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        {t('running')}
+                                        <span>{t('running')}</span>
                                     </>
                                 ) : (
                                     <>
-                                        <svg className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                         </svg>
-                                        {t('run')}
+                                        <span>{t('run')}</span>
                                     </>
                                 )}
-                            </span>
-                            <span className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                        </button>
-                        <button 
-                            type="button" 
-                            className="group/clear bg-bg-tertiary/80 backdrop-blur-xl text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center relative overflow-hidden"
-                            onClick={handleClear}
-                        >
-                            <span className="relative z-10 flex items-center justify-center gap-2">
-                                <svg className="w-4 h-4 transition-transform duration-300 group-hover/clear:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </button>
+                            <button 
+                                type="button" 
+                                className="secondary"
+                                onClick={handleClear}
+                                disabled={isRunning}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
-                                {t('clear')}
-                            </span>
-                            <span className="absolute inset-0 bg-accent-gradient opacity-0 group-hover/clear:opacity-5 transition-opacity duration-300"></span>
-                        </button>
+                                <span>{t('clear')}</span>
+                            </button>
+                        </div>
                     </div>
-                    <div style={{ gridArea: 'output' }}>
-                        <OutputPanel input={input} setInput={setInput} output={output} error={error} />
-                    </div>
+                    <OutputPanel input={input} setInput={setInput} output={output} error={error} />
                 </div>
             </main>
+            {pendingLanguageChange && (
+                <Modal
+                    title={t('continue-question')}
+                    message={t('language-change-message')}
+                    onConfirm={confirmLanguageChange}
+                    onCancel={() => setPendingLanguageChange(null)}
+                />
+            )}
         </>
     );
 };
