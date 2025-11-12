@@ -186,6 +186,15 @@ const FONT_CONFIG = {
 let currentLang = localStorage.getItem('language') || 'ko';
 let codeEditor = null;
 
+
+function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
 function updateLanguage(lang) {
     currentLang = lang;
     localStorage.setItem('language', lang);
@@ -451,6 +460,7 @@ function initEditor() {
                 localStorage.setItem(`code_${language}`, code);
             }
         }
+        const saveCodeToStorageDebounced = debounce(saveCodeToStorage, 300);
 
         function loadCodeFromStorage() {
             const language = elements.languageSelect.value;
@@ -708,21 +718,28 @@ function initEditor() {
                 }
 
                 if (hasOutput) {
-                    const lines = data.output.split('\n');
-                    lines.forEach((line) => {
-                        if (line.trim() || lines.indexOf(line) < lines.length - 1) {
-                            appendToConsole(line, 'output');
-                        }
-                    });
+                    const normalized = data.output.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    const collapsed = normalized.replace(/\n{2,}/g, '\n').replace(/[ \t]+\n/g, '\n').trimEnd();
+                    const pre = document.createElement('pre');
+                    pre.textContent = collapsed;
+                    if (elements.consoleOutput) {
+                        elements.consoleOutput.appendChild(pre);
+                        elements.consoleOutput.scrollTop = elements.consoleOutput.scrollHeight;
+                    }
                 }
 
                 if (hasError) {
-                    const errorLines = data.error.split('\n');
-                    errorLines.forEach((line) => {
-                        if (line.trim() || errorLines.length === 1) {
-                            appendToConsole(line, 'error');
-                        }
-                    });
+                    const normalizedErr = data.error.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    const collapsedErr = normalizedErr.replace(/\n{2,}/g, '\n').replace(/[ \t]+\n/g, '\n').trimEnd();
+                    const pre = document.createElement('pre');
+                    pre.textContent = collapsedErr;
+                    pre.style.color = getComputedStyle(document.documentElement)
+                        .getPropertyValue('--error-color')
+                        .trim() || '#f44336';
+                    if (elements.consoleOutput) {
+                        elements.consoleOutput.appendChild(pre);
+                        elements.consoleOutput.scrollTop = elements.consoleOutput.scrollHeight;
+                    }
                 }
 
                 if (
@@ -808,8 +825,7 @@ function initEditor() {
         });
 
         codeEditor.onDidChangeModelContent(() => {
-            saveCodeToStorage();
-            updateAutoComplete();
+            saveCodeToStorageDebounced();
         });
 
         function updateAutoComplete() {
