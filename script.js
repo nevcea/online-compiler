@@ -264,6 +264,10 @@ let pendingLanguageChange = null;
 
 const cleanupFunctions = [];
 
+function getTranslation(key) {
+    return translations[currentLang]?.[key] || translations.en[key] || '';
+}
+
 function debounce(fn, delay) {
     let timer = null;
     const debounced = (...args) => {
@@ -677,7 +681,7 @@ function initEditor() {
                                 elements.runButton?.click();
                             } else {
                                 if (elements.consoleOutput) {
-                                    elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['no-code-error']}</p>`;
+                                    elements.consoleOutput.innerHTML = `<p class="text-muted">${getTranslation('no-code-error')}</p>`;
                                 }
                             }
                         }
@@ -888,7 +892,7 @@ function initEditor() {
 
         function resetConsoleOutput() {
             if (elements.consoleOutput) {
-                elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['output-placeholder'].trim()}</p>`;
+                elements.consoleOutput.innerHTML = `<p class="text-muted">${getTranslation('output-placeholder').trim()}</p>`;
             }
         }
 
@@ -919,7 +923,7 @@ function initEditor() {
                     }
                     if (!codeEditor && !window.codeEditor) {
                         if (elements.consoleOutput) {
-                            elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]?.['connection-error'] || translations.en['connection-error']}: 에디터가 준비되지 않았습니다. 페이지를 새로고침해주세요.</p>`;
+                            elements.consoleOutput.innerHTML = `<p class="text-muted">${getTranslation('connection-error')}: 에디터가 준비되지 않았습니다. 페이지를 새로고침해주세요.</p>`;
                         }
                         return;
                     }
@@ -935,7 +939,7 @@ function initEditor() {
 
             if (!code || !code.trim()) {
                 if (elements.consoleOutput) {
-                    elements.consoleOutput.innerHTML = `<p class="text-muted">${translations[currentLang]['no-code-error']}</p>`;
+                    elements.consoleOutput.innerHTML = `<p class="text-muted">${getTranslation('no-code-error')}</p>`;
                 }
                 return;
             }
@@ -954,8 +958,7 @@ function initEditor() {
             }
 
             elements.runButton.disabled = true;
-            elements.runButton.textContent =
-                translations[currentLang]['running'] || translations.en['running'];
+            elements.runButton.textContent = getTranslation('running');
 
             if (elements.consoleOutput) {
                 elements.consoleOutput.innerHTML = '';
@@ -973,16 +976,14 @@ function initEditor() {
                 });
 
                 if (!response.ok) {
-                    let errorMessage =
-                        translations[currentLang]?.['request-error'] ||
-                        translations.en['request-error'];
+                    let errorMessage = getTranslation('request-error');
                     try {
                         const errorData = await response.json();
                         if (errorData.error) {
                             errorMessage = errorData.error;
                         }
-                    } catch {
-                        // Ignore JSON parse errors
+                    } catch (e) {
+                        console.debug('Failed to parse error response:', e);
                     }
                     throw new Error(`HTTP ${response.status}: ${errorMessage}`);
                 }
@@ -1041,9 +1042,7 @@ function initEditor() {
 
                     const lines = collapsedErr.split('\n');
                     if (lines.length > CONFIG.MAX_ERROR_LINES) {
-                        const moreMsg =
-                            translations[currentLang]?.['more-error-messages'] ||
-                            translations.en['more-error-messages'];
+                        const moreMsg = getTranslation('more-error-messages');
                         collapsedErr =
                             lines.slice(0, CONFIG.MAX_ERROR_LINES).join('\n') + '\n' + moreMsg;
                     }
@@ -1069,10 +1068,7 @@ function initEditor() {
                     !inputValue &&
                     (!data.images || data.images.length === 0)
                 ) {
-                    appendToConsole(
-                        translations[currentLang]['no-output'] || translations.en['no-output'],
-                        'info'
-                    );
+                    appendToConsole(getTranslation('no-output'), 'info');
                 }
 
                 if (elements.consoleInput) {
@@ -1082,32 +1078,20 @@ function initEditor() {
             } catch (error) {
                 console.error('Execution error:', error);
                 if (elements.consoleOutput) {
-                    let userMessage =
-                        translations[currentLang]?.['connection-error'] ||
-                        translations.en['connection-error'];
+                    let userMessage = getTranslation('connection-error');
 
                     if (error.message) {
                         const msg = error.message.toLowerCase();
                         if (msg.includes('failed to fetch') || msg.includes('network')) {
-                            userMessage =
-                                translations[currentLang]?.['cannot-connect-server'] ||
-                                translations.en['cannot-connect-server'];
+                            userMessage = getTranslation('cannot-connect-server');
                         } else if (msg.includes('timeout')) {
-                            userMessage =
-                                translations[currentLang]?.['request-timeout'] ||
-                                translations.en['request-timeout'];
+                            userMessage = getTranslation('request-timeout');
                         } else if (msg.includes('400')) {
-                            userMessage =
-                                translations[currentLang]?.['bad-request'] ||
-                                translations.en['bad-request'];
+                            userMessage = getTranslation('bad-request');
                         } else if (msg.includes('500')) {
-                            userMessage =
-                                translations[currentLang]?.['server-error'] ||
-                                translations.en['server-error'];
+                            userMessage = getTranslation('server-error');
                         } else if (msg.includes('parse')) {
-                            userMessage =
-                                translations[currentLang]?.['cannot-process-response'] ||
-                                translations.en['cannot-process-response'];
+                            userMessage = getTranslation('cannot-process-response');
                         } else {
                             const match = error.message.match(/HTTP \d+: (.+)/);
                             if (match && match[1]) {
@@ -1117,17 +1101,12 @@ function initEditor() {
                     }
 
                     appendToConsole(userMessage, 'error');
-                    appendToConsole(
-                        translations[currentLang]?.['check-backend'] ||
-                            translations.en['check-backend'],
-                        'info'
-                    );
+                    appendToConsole(getTranslation('check-backend'), 'info');
                 }
             } finally {
                 if (elements.runButton) {
                     elements.runButton.disabled = false;
-                    elements.runButton.textContent =
-                        translations[currentLang]?.['run'] || translations.en?.['run'] || 'Run';
+                    elements.runButton.textContent = getTranslation('run') || 'Run';
                 }
                 if (elements.consoleInput) {
                     elements.consoleInput.disabled = false;
@@ -1393,9 +1372,9 @@ function initSettings() {
     function updateThemeSelectDisplay() {
         const currentTheme = localStorage.getItem('theme') || CONFIG.DEFAULT_THEME;
         const themeNames = {
-            system: translations[currentLang]?.['system-theme'] || translations.en['system-theme'],
-            dark: translations[currentLang]?.['dark-theme'] || translations.en['dark-theme'],
-            light: translations[currentLang]?.['light-theme'] || translations.en['light-theme']
+            system: getTranslation('system-theme'),
+            dark: getTranslation('dark-theme'),
+            light: getTranslation('light-theme')
         };
 
         if (elements.themeSelectName) {
@@ -1415,7 +1394,7 @@ function initSettings() {
         }
         if (elements.settingsLangName) {
             elements.settingsLangName.textContent =
-                currentLang === 'ko' ? translations.ko['korean'] : translations.en['english'];
+                currentLang === 'ko' ? getTranslation('korean') : getTranslation('english');
         }
 
         if (elements.settingsLangDropdown) {

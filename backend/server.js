@@ -18,7 +18,9 @@ const {
     ALLOWED_IMAGES,
     DANGEROUS_PATTERNS,
     DOCKER_PULL_MESSAGES,
-    DEBUG_PATTERNS
+    DEBUG_PATTERNS,
+    KOTLIN_DOWNLOAD_CMD,
+    KOTLIN_COMPILER_CHECK
 } = require('./config');
 
 const app = express();
@@ -61,8 +63,7 @@ async function warmupKotlinOnStart() {
         return;
     }
     const image = 'eclipse-temurin:17-jdk-alpine';
-    const cmd =
-        'if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q --timeout=10 --tries=2 https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q --timeout=10 --tries=2 https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version';
+    const cmd = `if ${KOTLIN_COMPILER_CHECK}; then ${KOTLIN_DOWNLOAD_CMD}; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version`;
     try {
         await runDockerCommand(image, cmd, TMPFS_SIZES.kotlin, 20000, true);
     } catch {
@@ -445,7 +446,7 @@ function getWarmupConfigs() {
             image: 'eclipse-temurin:17-jdk-alpine',
             command: kotlinCompilerExistsOnHost()
                 ? 'java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version'
-                : 'if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q --timeout=10 --tries=2 https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q --timeout=10 --tries=2 https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version',
+                : `if ${KOTLIN_COMPILER_CHECK}; then ${KOTLIN_DOWNLOAD_CMD}; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version`,
             tmpfsSize: TMPFS_SIZES.kotlin,
             timeout: 15000
         },

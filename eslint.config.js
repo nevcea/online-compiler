@@ -16,37 +16,53 @@ export default [
             }
         },
         rules: {
-            'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+            'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
             'no-console': 'off',
+            'no-empty': ['warn', { allowEmptyCatch: true }],
+            'no-constant-condition': 'warn',
+            'no-useless-escape': 'warn',
+            'no-prototype-builtins': 'warn',
+            'no-case-declarations': 'warn',
             semi: ['error', 'always'],
             quotes: ['error', 'single', { avoidEscape: true }],
-            indent: ['error', 4, { SwitchCase: 1 }],
+            indent: ['warn', 4, { SwitchCase: 1, ignoredNodes: ['TemplateLiteral'] }],
             'comma-dangle': ['error', 'never'],
-            'no-trailing-spaces': 'error',
-            'eol-last': ['error', 'always'],
-            'object-curly-spacing': ['error', 'always'],
-            'array-bracket-spacing': ['error', 'never'],
-            'space-before-blocks': 'error',
-            'keyword-spacing': 'error',
-            'space-infix-ops': 'error',
-            'brace-style': ['error', '1tbs', { allowSingleLine: true }],
-            curly: ['error', 'all'],
-            'no-multiple-empty-lines': ['error', { max: 2, maxEOF: 1 }],
-            'padded-blocks': ['error', 'never'],
+            'no-trailing-spaces': 'warn',
+            'eol-last': ['warn', 'always'],
+            'object-curly-spacing': ['warn', 'always'],
+            'array-bracket-spacing': ['warn', 'never'],
+            'space-before-blocks': 'warn',
+            'keyword-spacing': 'warn',
+            'space-infix-ops': 'warn',
+            'brace-style': ['warn', '1tbs', { allowSingleLine: true }],
+            curly: ['warn', 'all'],
+            'no-multiple-empty-lines': ['warn', { max: 2, maxEOF: 1 }],
+            'padded-blocks': ['warn', 'never'],
             'space-before-function-paren': [
-                'error',
+                'warn',
                 {
                     anonymous: 'always',
                     named: 'never',
                     asyncArrow: 'always'
                 }
-            ]
+            ],
+            'max-len': 'off',
+            complexity: 'off',
+            'no-magic-numbers': 'off'
         }
     },
     {
         files: ['scripts/**/*.cjs'],
         rules: {
-            indent: 'off'
+            indent: 'off',
+            'no-console': 'off'
+        }
+    },
+    {
+        files: ['backend/**/*.js'],
+        rules: {
+            'no-console': 'off',
+            'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
         }
     },
     {

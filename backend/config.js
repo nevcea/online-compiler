@@ -1,5 +1,10 @@
 const MAX_EXECUTION_TIME = 10000;
 
+const KOTLIN_COMPILER_VERSION = '2.0.21';
+const KOTLIN_COMPILER_URL = `https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_COMPILER_VERSION}/kotlin-compiler-${KOTLIN_COMPILER_VERSION}.zip`;
+const KOTLIN_DOWNLOAD_CMD = `cd /tmp && (busybox wget -q --timeout=10 --tries=2 ${KOTLIN_COMPILER_URL} -O kotlin.zip || wget -q --timeout=10 --tries=2 ${KOTLIN_COMPILER_URL} -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin`;
+const KOTLIN_COMPILER_CHECK = '[ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]';
+
 const CONFIG = {
     PORT: process.env.PORT || 3000,
     MAX_CODE_LENGTH: 100000,
@@ -189,11 +194,13 @@ const LANGUAGE_CONFIGS = {
                 '-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xms64m -Xmx256m -XX:ReservedCodeCacheSize=32m -XX:InitialCodeCacheSize=16m -XX:+UseStringDeduplication -XX:+OptimizeStringConcat';
             const kotlinOpts =
                 '-Xjvm-default=all -Xno-param-assertions -Xno-call-assertions -Xno-receiver-assertions';
+            const kotlinSetup = `if ${KOTLIN_COMPILER_CHECK}; then ${KOTLIN_DOWNLOAD_CMD}; fi`;
+            const compileCmd = `mkdir -p ${buildDir}/out && java ${jvmOpts} -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ${kotlinOpts} -d ${buildDir}/out "${path}" 2>&1`;
             if (inputPath) {
                 const tmpInputPath = '/tmp/input.txt';
-                return `cd /tmp && export JAVA_TOOL_OPTIONS="${jvmOpts}" && if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi && mkdir -p ${buildDir}/out && java ${jvmOpts} -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ${kotlinOpts} -d ${buildDir}/out "${path}" 2>&1 && cp "${inputPath}" "${tmpInputPath}" && java ${jvmOpts} -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt < "${tmpInputPath}" 2>&1`;
+                return `cd /tmp && export JAVA_TOOL_OPTIONS="${jvmOpts}" && ${kotlinSetup} && ${compileCmd} && cp "${inputPath}" "${tmpInputPath}" && java ${jvmOpts} -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt < "${tmpInputPath}" 2>&1`;
             } else {
-                return `cd /tmp && export JAVA_TOOL_OPTIONS="${jvmOpts}" && if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi && mkdir -p ${buildDir}/out && java ${jvmOpts} -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ${kotlinOpts} -d ${buildDir}/out "${path}" 2>&1 && java ${jvmOpts} -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt 2>&1`;
+                return `cd /tmp && export JAVA_TOOL_OPTIONS="${jvmOpts}" && ${kotlinSetup} && ${compileCmd} && java ${jvmOpts} -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt 2>&1`;
             }
         },
         timeout: MAX_EXECUTION_TIME * 3
@@ -335,5 +342,9 @@ module.exports = {
     ALLOWED_IMAGES,
     DANGEROUS_PATTERNS,
     DOCKER_PULL_MESSAGES,
-    DEBUG_PATTERNS
+    DEBUG_PATTERNS,
+    KOTLIN_COMPILER_VERSION,
+    KOTLIN_COMPILER_URL,
+    KOTLIN_DOWNLOAD_CMD,
+    KOTLIN_COMPILER_CHECK
 };
