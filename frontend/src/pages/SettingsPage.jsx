@@ -31,14 +31,15 @@ const SettingsPage = () => {
                         </button>
                     </div>
                     <div className="flex flex-col gap-6">
-                        <div className="bg-bg-secondary border border-border-color rounded-md p-7 shadow-sm transition-all duration-200 hover:shadow-md hover:border-border-hover md:p-5">
-                            <h3 className="text-base font-semibold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-3 border-b border-border-color before:content-[''] before:w-0.5 before:h-4 before:bg-accent-gradient before:rounded-sm md:text-[0.9375rem] md:mb-5">
+                        <div className="bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-1 md:p-6">
+                            <h3 className="text-lg font-bold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-4 border-b border-border-color/50 md:text-base md:mb-5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-accent-primary"></div>
                                 {t('language-settings')}
                             </h3>
                             <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6">
                                 <label className="text-[0.9375rem] font-medium text-text-primary select-none">{t('interface-language')}</label>
                                 <select
-                                    className="bg-bg-tertiary text-text-primary border border-border-color px-3 py-2.5 rounded-md text-sm cursor-pointer transition-all duration-200 w-full max-w-[400px] hover:border-accent-primary focus:outline-none focus:border-accent-primary focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)] md:max-w-full"
+                                    className="bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-4 py-3 rounded-xl text-sm cursor-pointer transition-all duration-300 w-full max-w-[400px] hover:border-accent-primary/50 hover:shadow-md focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 md:max-w-full"
                                     value={currentLang}
                                     onChange={(e) => setCurrentLang(e.target.value)}
                                 >
@@ -47,8 +48,9 @@ const SettingsPage = () => {
                                 </select>
                             </div>
                         </div>
-                        <div className="bg-bg-secondary border border-border-color rounded-md p-7 shadow-sm transition-all duration-200 hover:shadow-md hover:border-border-hover md:p-5">
-                            <h3 className="text-base font-semibold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-3 border-b border-border-color before:content-[''] before:w-0.5 before:h-4 before:bg-accent-gradient before:rounded-sm md:text-[0.9375rem] md:mb-5">
+                        <div className="bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-1 md:p-6">
+                            <h3 className="text-lg font-bold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-4 border-b border-border-color/50 md:text-base md:mb-5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-accent-primary"></div>
                                 {t('theme-settings')}
                             </h3>
                             <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6">
@@ -64,14 +66,15 @@ const SettingsPage = () => {
                                 </select>
                             </div>
                         </div>
-                        <div className="bg-bg-secondary border border-border-color rounded-md p-7 shadow-sm transition-all duration-200 hover:shadow-md hover:border-border-hover md:p-5">
-                            <h3 className="text-base font-semibold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-3 border-b border-border-color before:content-[''] before:w-0.5 before:h-4 before:bg-accent-gradient before:rounded-sm md:text-[0.9375rem] md:mb-5">
+                        <div className="bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-1 md:p-6">
+                            <h3 className="text-lg font-bold mb-6 text-text-primary tracking-tight flex items-center gap-3 pb-4 border-b border-border-color/50 md:text-base md:mb-5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-accent-primary"></div>
                                 {t('editor-settings')}
                             </h3>
                             <div className="flex flex-col gap-3.5 mb-7 last:mb-0 md:gap-3 md:mb-6">
                                 <label className="text-[0.9375rem] font-medium text-text-primary select-none">{t('font-family')}</label>
                                 <select
-                                    className="bg-bg-tertiary text-text-primary border border-border-color px-3 py-2.5 rounded-md text-sm cursor-pointer transition-all duration-200 w-full max-w-[400px] hover:border-accent-primary focus:outline-none focus:border-accent-primary focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)] md:max-w-full"
+                                    className="bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-4 py-3 rounded-xl text-sm cursor-pointer transition-all duration-300 w-full max-w-[400px] hover:border-accent-primary/50 hover:shadow-md focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 md:max-w-full"
                                     value={fontFamily}
                                     onChange={(e) => setFontFamily(e.target.value)}
                                 >

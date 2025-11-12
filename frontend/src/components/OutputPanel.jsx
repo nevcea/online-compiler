@@ -13,17 +13,23 @@ const OutputPanel = ({ input, setInput, output, error }) => {
     const hasContent = outputText || error || images.length > 0;
 
     return (
-        <div className="flex flex-col bg-bg-secondary border border-border-color rounded-md overflow-hidden min-h-[400px] h-full shadow-sm transition-all duration-200 relative hover:shadow-md hover:border-border-hover before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-accent-gradient before:opacity-0 before:transition-opacity before:duration-200 hover:before:opacity-100 md:min-h-[300px]" style={{ gridArea: 'output' }}>
-            <div className="bg-bg-tertiary px-5 py-3 border-b border-border-color flex justify-between items-center min-h-[44px] md:px-4 md:min-h-[48px] md:flex-wrap md:gap-2">
-                <span className="font-semibold text-text-secondary text-xs uppercase tracking-wider font-variant-small-caps flex items-center gap-2 flex-1 after:content-[''] after:flex-1 after:h-px after:bg-border-color after:ml-2 md:text-[0.8rem]">
-                    {t('execution-result')}
-                </span>
+        <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden min-h-[400px] h-full shadow-lg transition-all duration-300 relative hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[300px]" style={{ gridArea: 'output' }}>
+            <div className="bg-gradient-to-r from-bg-tertiary to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex justify-between items-center min-h-[52px] md:px-4 md:min-h-[48px] md:flex-wrap md:gap-2">
+                <div className="flex items-center gap-3 flex-1">
+                    <div className="w-2 h-2 rounded-full bg-success"></div>
+                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest">
+                        {t('execution-result')}
+                    </span>
+                </div>
                 {hasContent && (
                     <button 
-                        className="flex items-center gap-2 bg-transparent text-text-secondary border border-transparent px-3.5 py-2 rounded-sm text-[0.8125rem] font-medium cursor-pointer transition-all duration-200 hover:bg-bg-secondary hover:text-text-primary hover:border-border-color active:scale-[0.98] active:bg-bg-tertiary focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:text-[0.8rem] md:px-2.5 md:py-1.5" 
+                        className="flex items-center gap-2 bg-bg-tertiary/50 text-text-secondary border border-border-color/50 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all duration-300 hover:bg-error/10 hover:text-error hover:border-error/30 active:scale-95 focus-visible:outline-2 focus-visible:outline-error focus-visible:outline-offset-2 md:text-[0.8rem] md:px-3 md:py-1.5" 
                         onClick={handleClear} 
                         title={t('clear-output')}
                     >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                         <span>{t('clear-output')}</span>
                     </button>
                 )}

@@ -111,36 +111,58 @@ const CompilerPage = () => {
                             onCancelChange={() => setPendingLanguageChange(null)}
                         />
                     </div>
-                    <div className="flex flex-col bg-bg-secondary border border-border-color rounded-md overflow-hidden h-full min-h-[400px] shadow-sm transition-all duration-200 relative hover:shadow-md hover:border-border-hover md:min-h-[350px]" style={{ gridArea: 'editor' }}>
-                        <div className="relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-accent-gradient before:opacity-0 before:transition-opacity before:duration-200 hover:before:opacity-100">
-                            <div className="bg-bg-tertiary px-5 py-3 border-b border-border-color flex items-center min-h-[44px]">
-                                <span className="font-semibold text-text-secondary text-xs uppercase tracking-wider font-variant-small-caps flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-border-color after:ml-2">
-                                    {t('code-editor')}
-                                </span>
+                    <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden h-full min-h-[400px] shadow-lg transition-all duration-300 relative hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[350px]" style={{ gridArea: 'editor' }}>
+                        <div className="relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-accent-gradient before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100">
+                            <div className="bg-gradient-to-r from-bg-tertiary to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex items-center min-h-[52px]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-accent-primary"></div>
+                                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest flex items-center gap-3">
+                                        {t('code-editor')}
+                                    </span>
+                                </div>
                             </div>
                             <div className="flex relative min-h-[350px] flex-1 md:min-h-[300px]">
                                 <CodeEditor onRun={handleRun} />
                             </div>
                         </div>
                     </div>
-                    <div className="flex gap-3.5 justify-end items-center py-4 flex-wrap border-t border-border-color mt-2 pt-5 md:flex-col md:w-full md:gap-3 md:py-2" style={{ gridArea: 'actions' }}>
+                    <div className="flex gap-4 justify-end items-center py-6 flex-wrap md:flex-col md:w-full md:gap-3 md:py-4" style={{ gridArea: 'actions' }}>
                         <button
                             type="button"
-                            className="bg-accent-primary text-white border-none px-6 py-2.5 rounded-sm text-sm font-semibold cursor-pointer transition-all duration-200 shadow-sm min-w-[100px] hover:bg-accent-hover hover:shadow-md hover:-translate-y-px active:translate-y-0 active:scale-[0.98] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none md:w-full md:justify-center"
+                            className="group relative bg-accent-gradient text-white border-none px-8 py-3.5 rounded-xl text-sm font-bold cursor-pointer transition-all duration-300 shadow-lg shadow-accent-primary/30 min-w-[120px] hover:shadow-xl hover:shadow-accent-primary/40 hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none md:w-full md:justify-center overflow-hidden"
                             onClick={handleRun}
                             disabled={isRunning}
                         >
-                            {isRunning ? t('running') : t('run')}
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                {isRunning ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        {t('running')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {t('run')}
+                                    </>
+                                )}
+                            </span>
+                            <span className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                         </button>
                         <button 
                             type="button" 
-                            className="bg-bg-tertiary text-text-primary border border-border-color px-6 py-2.5 rounded-sm text-sm font-semibold cursor-pointer transition-all duration-200 shadow-sm hover:bg-bg-secondary hover:border-border-hover focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center"
+                            className="bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center"
                             onClick={handleClear}
                         >
                             {t('clear')}
                         </button>
                     </div>
-                    <div className="[grid-area:output]">
+                    <div style={{ gridArea: 'output' }}>
                         <OutputPanel input={input} setInput={setInput} output={output} error={error} />
                     </div>
                 </div>

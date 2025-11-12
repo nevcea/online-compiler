@@ -29,7 +29,7 @@ const LanguageSelector = ({ onLanguageChange, pendingChange, onConfirmChange, on
 
     return (
         <>
-            <div className="flex items-center gap-4 p-4 bg-bg-secondary border border-border-color rounded-md relative z-[1] transition-all duration-200 shadow-sm hover:border-accent-primary hover:shadow-md hover:-translate-y-px md:flex-col md:items-stretch md:gap-3 md:p-4">
+            <div className="flex items-center gap-4 p-5 bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl relative z-[1] transition-all duration-300 shadow-md hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-1 hover:bg-bg-secondary md:flex-col md:items-stretch md:gap-3 md:p-4">
                 <label className="font-medium text-text-primary whitespace-nowrap text-[0.9375rem] select-none">{t('programming-language')}</label>
                 <div className="relative flex-1 max-w-[300px] z-[10001] md:max-w-full">
                     <button
@@ -49,7 +49,7 @@ const LanguageSelector = ({ onLanguageChange, pendingChange, onConfirmChange, on
                         <span className={`text-xs transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
                     </button>
                     {isOpen && (
-                        <div ref={dropdownRef} className="absolute top-[calc(100%+8px)] left-0 right-0 bg-[rgba(26,26,26,0.98)] backdrop-blur-2xl border border-border-color rounded-md shadow-lg z-[10001] max-h-[300px] overflow-y-auto block mt-1">
+                        <div ref={dropdownRef} className="absolute top-[calc(100%+12px)] left-0 right-0 bg-bg-secondary/95 backdrop-blur-2xl border border-border-color rounded-xl shadow-xl z-[10001] max-h-[300px] overflow-y-auto block mt-2 animate-[slideUp_0.2s_ease-out]">
                             {languages.map((lang) => (
                                 <div
                                     key={lang}

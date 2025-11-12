@@ -26,16 +26,19 @@ export default {
       },
       backgroundImage: {
         'accent-gradient': 'var(--accent-gradient)',
+        'accent-gradient-subtle': 'var(--accent-gradient-subtle)',
       },
       borderRadius: {
         'sm': 'var(--radius-sm)',
         'md': 'var(--radius-md)',
         'lg': 'var(--radius-lg)',
+        'xl': 'var(--radius-xl)',
       },
       boxShadow: {
         'sm': 'var(--shadow-sm)',
         'md': 'var(--shadow-md)',
         'lg': 'var(--shadow-lg)',
+        'xl': 'var(--shadow-xl)',
       },
     },
   },
