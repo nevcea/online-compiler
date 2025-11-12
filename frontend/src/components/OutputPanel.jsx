@@ -13,16 +13,25 @@ const OutputPanel = ({ input, setInput, output, error }) => {
     const hasContent = outputText || error || images.length > 0;
 
     return (
-        <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden min-h-[400px] h-full shadow-lg transition-all duration-300 relative hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[300px]" style={{ gridArea: 'output' }}>
-            <div className="bg-gradient-to-r from-bg-tertiary to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex justify-between items-center min-h-[52px] md:px-4 md:min-h-[48px] md:flex-wrap md:gap-2">
+        <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden min-h-[400px] h-full shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[300px]" style={{ gridArea: 'output' }}>
+            <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
+            <div className="bg-gradient-to-r from-bg-tertiary via-bg-tertiary/60 to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex justify-between items-center min-h-[52px] md:px-4 md:min-h-[48px] md:flex-wrap md:gap-2 relative">
                 <div className="flex items-center gap-3 flex-1">
-                    <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-warning animate-pulse' : error ? 'bg-error' : 'bg-success'}`}></div>
-                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest">
+                    <div className="relative">
+                        <div className={`w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-warning animate-pulse shadow-lg shadow-warning/50' : error ? 'bg-error shadow-lg shadow-error/50' : 'bg-success shadow-lg shadow-success/50'}`}></div>
+                        {isRunning && (
+                            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-warning animate-ping opacity-75"></div>
+                        )}
+                    </div>
+                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest flex items-center gap-2">
+                        <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                         {t('execution-result')}
                     </span>
                     {executionTime !== null && !isRunning && (
-                        <span className="text-xs text-text-muted font-normal normal-case tracking-normal">
-                            ({executionTime}ms)
+                        <span className="text-xs text-text-muted font-normal normal-case tracking-normal px-2 py-0.5 bg-bg-secondary/50 rounded-md border border-border-color/30">
+                            {executionTime}ms
                         </span>
                     )}
                 </div>
@@ -42,17 +51,25 @@ const OutputPanel = ({ input, setInput, output, error }) => {
             <div id="output" className="flex-1 flex flex-col min-h-[120px]">
                 <div className="flex-1 p-5 font-mono text-sm leading-[1.7] whitespace-pre-wrap break-words overflow-y-auto text-text-primary min-h-[100px] max-h-[500px] bg-bg-primary relative md:p-4 md:text-[13px] md:max-h-[400px]">
                     {isRunning ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-4">
+                        <div className="flex flex-col items-center justify-center h-full gap-4 relative">
                             <div className="relative">
-                                <div className="w-12 h-12 border-4 border-accent-primary/20 border-t-accent-primary rounded-full animate-spin"></div>
+                                <div className="w-14 h-14 border-4 border-accent-primary/20 border-t-accent-primary rounded-full animate-spin shadow-lg"></div>
+                                <div className="absolute inset-0 w-14 h-14 border-4 border-transparent border-r-accent-secondary/30 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
                             </div>
-                            <p className="text-text-muted text-sm">{t('executing') || 'Executing code...'}</p>
+                            <p className="text-text-muted text-sm font-medium animate-pulse">{t('executing') || 'Executing code...'}</p>
                         </div>
                     ) : !hasContent ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-3">
-                            <svg className="w-16 h-16 text-text-muted/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                        <div className="flex flex-col items-center justify-center h-full gap-4 relative">
+                            <div className="relative">
+                                <svg className="w-20 h-20 text-text-muted/20 animate-[float_3s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <div className="absolute inset-0 w-20 h-20 text-accent-primary/10 animate-pulse">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                            </div>
                             <p className="m-0 p-0 text-text-muted font-mono text-sm leading-[1.7] text-center md:text-[13px]">{t('output-placeholder')}</p>
                         </div>
                     ) : (

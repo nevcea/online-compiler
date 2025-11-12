@@ -152,20 +152,27 @@ const CompilerPage = () => {
                             onCancelChange={() => setPendingLanguageChange(null)}
                         />
                     </div>
-                    <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden h-full min-h-[400px] shadow-lg transition-all duration-300 relative hover:shadow-xl hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[350px]" style={{ gridArea: 'editor' }}>
+                    <div className="flex flex-col bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl overflow-hidden h-full min-h-[400px] shadow-lg transition-all duration-300 relative hover:shadow-xl hover:shadow-accent-primary/10 hover:border-accent-primary/30 hover:-translate-y-0.5 group md:min-h-[350px]" style={{ gridArea: 'editor' }}>
+                        <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
                         <div className="relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-accent-gradient before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100">
-                            <div className="bg-gradient-to-r from-bg-tertiary to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex items-center justify-between min-h-[52px]">
+                            <div className="bg-gradient-to-r from-bg-tertiary via-bg-tertiary/60 to-bg-tertiary/50 px-6 py-4 border-b border-border-color/50 flex items-center justify-between min-h-[52px] relative">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-2 h-2 rounded-full bg-accent-primary"></div>
-                                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest">
+                                    <div className="relative">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-accent-primary shadow-lg shadow-accent-primary/50"></div>
+                                        <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-accent-primary animate-ping opacity-75"></div>
+                                    </div>
+                                    <span className="font-bold text-text-primary text-sm uppercase tracking-widest flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                        </svg>
                                         {t('code-editor')}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-text-muted">
-                                    <kbd className="px-2 py-1 bg-bg-secondary border border-border-color rounded text-[10px]">Ctrl</kbd>
-                                    <span>+</span>
-                                    <kbd className="px-2 py-1 bg-bg-secondary border border-border-color rounded text-[10px]">Enter</kbd>
-                                    <span className="ml-1">{t('to-run') || 'to run'}</span>
+                                    <kbd className="px-2.5 py-1 bg-bg-secondary/80 border border-border-color/50 rounded-md text-[10px] font-medium shadow-sm">Ctrl</kbd>
+                                    <span className="text-text-muted/60">+</span>
+                                    <kbd className="px-2.5 py-1 bg-bg-secondary/80 border border-border-color/50 rounded-md text-[10px] font-medium shadow-sm">Enter</kbd>
+                                    <span className="ml-1.5 text-text-muted/70">{t('to-run') || 'to run'}</span>
                                 </div>
                             </div>
                             <div className="flex relative min-h-[350px] flex-1 md:min-h-[300px]">
@@ -176,10 +183,12 @@ const CompilerPage = () => {
                     <div className="flex gap-4 justify-end items-center py-6 flex-wrap md:flex-col md:w-full md:gap-3 md:py-4" style={{ gridArea: 'actions' }}>
                         <button
                             type="button"
-                            className="group relative bg-accent-gradient text-white border-none px-8 py-3.5 rounded-xl text-sm font-bold cursor-pointer transition-all duration-300 shadow-lg shadow-accent-primary/30 min-w-[120px] hover:shadow-xl hover:shadow-accent-primary/40 hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none md:w-full md:justify-center overflow-hidden"
+                            className="group relative bg-accent-gradient text-white border-none px-8 py-3.5 rounded-xl text-sm font-bold cursor-pointer transition-all duration-300 shadow-lg shadow-accent-primary/30 min-w-[120px] hover:shadow-xl hover:shadow-accent-primary/50 hover:-translate-y-1 hover:scale-105 active:translate-y-0 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none md:w-full md:justify-center overflow-hidden"
                             onClick={handleRun}
                             disabled={isRunning}
+                            style={{ backgroundSize: '200% auto' }}
                         >
+                            <span className="absolute inset-0 bg-accent-gradient opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[gradient-shift_3s_ease_infinite]"></span>
                             <span className="relative z-10 flex items-center justify-center gap-2">
                                 {isRunning ? (
                                     <>
@@ -191,9 +200,9 @@ const CompilerPage = () => {
                                     </>
                                 ) : (
                                     <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        <svg className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         {t('run')}
                                     </>
@@ -203,10 +212,16 @@ const CompilerPage = () => {
                         </button>
                         <button 
                             type="button" 
-                            className="bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center"
+                            className="group/clear bg-bg-tertiary/80 backdrop-blur-sm text-text-primary border border-border-color px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 shadow-md hover:bg-bg-secondary hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent-primary focus-visible:outline-offset-2 md:w-full md:justify-center relative overflow-hidden"
                             onClick={handleClear}
                         >
-                            {t('clear')}
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                <svg className="w-4 h-4 transition-transform duration-300 group-hover/clear:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                {t('clear')}
+                            </span>
+                            <span className="absolute inset-0 bg-accent-gradient opacity-0 group-hover/clear:opacity-5 transition-opacity duration-300"></span>
                         </button>
                     </div>
                     <div style={{ gridArea: 'output' }}>

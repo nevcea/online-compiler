@@ -29,9 +29,15 @@ const LanguageSelector = ({ onLanguageChange, pendingChange, onConfirmChange, on
 
     return (
         <>
-            <div className="flex items-center gap-4 p-5 bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl relative z-[1] transition-all duration-300 shadow-md hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/10 hover:-translate-y-1 hover:bg-bg-secondary md:flex-col md:items-stretch md:gap-3 md:p-4">
-                <label className="font-medium text-text-primary whitespace-nowrap text-[0.9375rem] select-none">{t('programming-language')}</label>
-                <div className="relative flex-1 max-w-[300px] z-[10001] md:max-w-full">
+            <div className="flex items-center gap-4 p-5 bg-bg-secondary/80 backdrop-blur-sm border border-border-color rounded-xl relative z-[1] transition-all duration-300 shadow-md hover:border-accent-primary/50 hover:shadow-lg hover:shadow-accent-primary/20 hover:-translate-y-1 hover:bg-bg-secondary md:flex-col md:items-stretch md:gap-3 md:p-4 group/selector">
+                <div className="absolute inset-0 rounded-xl bg-accent-gradient opacity-0 group-hover/selector:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
+                <label className="font-medium text-text-primary whitespace-nowrap text-[0.9375rem] select-none relative z-10 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    {t('programming-language')}
+                </label>
+                <div className="relative flex-1 max-w-[300px] z-[10001] md:max-w-full relative z-10">
                     <button
                         ref={buttonRef}
                         type="button"
