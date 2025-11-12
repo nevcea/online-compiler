@@ -53,10 +53,25 @@ $upArgs = $compose.Args + @('up','-d')
 & $compose.Exe @upArgs
 Assert-LastExitCode "docker compose up -d"
 
+Push-Location frontend
+try {
+    if (-not (Test-Path "node_modules")) {
+        Write-Host "Installing frontend dependencies..." -ForegroundColor Blue
+        npm install
+        Assert-LastExitCode "npm install (frontend)"
+    }
+} finally {
+    Pop-Location
+}
+
 Write-Host "[OK] Development environment is ready!" -ForegroundColor Green
-Write-Host "Frontend: http://localhost:8080" -ForegroundColor Cyan
+Write-Host "Starting frontend dev server..." -ForegroundColor Blue
+Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
 Write-Host "Backend API: http://localhost:3000" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "To stop services: docker compose down" -ForegroundColor Yellow
+Write-Host "To start frontend manually: cd frontend && npm run dev" -ForegroundColor Yellow
+
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\..\frontend'; npm run dev"
 Write-Host "To view logs: docker compose logs -f" -ForegroundColor Yellow
 

@@ -1,5 +1,5 @@
 export const CONFIG = {
-    API_URL: 'http://localhost:3000',
+    API_URL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
     DEFAULT_LANGUAGE: 'python',
     DEFAULT_THEME: 'system',
     DEFAULT_FONT_FAMILY: "'Consolas', 'Monaco', 'Courier New', monospace",

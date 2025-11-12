@@ -10,6 +10,8 @@
         "format": "prettier --write \"**/*.{js,json,css,html}\"",
         "format:check": "prettier --check \"**/*.{js,json,css,html}\"",
         "dev": "node scripts/dev.cjs",
+        "dev:frontend": "cd frontend && npm run dev",
+        "dev:backend": "cd backend && npm run dev",
         "test": "node scripts/test.cjs",
         "clean": "node scripts/clean.cjs",
         "docker:build": "docker-compose build",

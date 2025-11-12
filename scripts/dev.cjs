@@ -49,12 +49,29 @@ try {
 		console.log('Starting services...');
 		execSync(`${composeCmd} up -d`, { stdio: 'inherit', cwd: rootDir });
 
-		console.log('[OK] Development environment is ready!');
-		console.log('Frontend: http://localhost:8080');
-		console.log('Backend API: http://localhost:3000');
-		console.log('');
-		console.log('To stop services: docker compose down');
-		console.log('To view logs: docker compose logs -f');
+        console.log('Installing frontend dependencies...');
+        execSync('npm install', { stdio: 'inherit', cwd: path.join(rootDir, 'frontend') });
+
+        console.log('[OK] Development environment is ready!');
+        console.log('Starting frontend dev server...');
+        console.log('Frontend: http://localhost:5173');
+        console.log('Backend API: http://localhost:3000');
+        console.log('');
+        console.log('To stop services: docker compose down');
+        console.log('To view logs: docker compose logs -f');
+        console.log('To start frontend manually: cd frontend && npm run dev');
+        
+        const { spawn } = require('child_process');
+        const frontendProcess = spawn('npm', ['run', 'dev'], {
+            cwd: path.join(rootDir, 'frontend'),
+            stdio: 'inherit',
+            shell: true
+        });
+        
+        process.on('SIGINT', () => {
+            frontendProcess.kill();
+            process.exit();
+        });
 	}
 } catch (error) {
     console.error(`[ERROR] Error running script: ${error.message}`);
