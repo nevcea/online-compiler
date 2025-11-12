@@ -12,8 +12,8 @@ const CONFIG = {
     ENABLE_PRELOAD: (process.env.ENABLE_PRELOAD || 'true').toLowerCase() === 'true',
     ENABLE_WARMUP: (process.env.ENABLE_WARMUP || 'true').toLowerCase() === 'true',
     TRUST_PROXY: (process.env.TRUST_PROXY || 'false').toLowerCase() === 'true',
-    DEBUG_MODE: process.env.DEBUG 
-        ? process.env.DEBUG.toLowerCase() === 'true' 
+    DEBUG_MODE: process.env.DEBUG
+        ? process.env.DEBUG.toLowerCase() === 'true'
         : process.env.NODE_ENV !== 'production',
     TIMEOUT_BUFFER_MS: 2000,
     SIGKILL_DELAY_MS: 2000,
@@ -177,8 +177,10 @@ const LANGUAGE_CONFIGS = {
     kotlin: {
         image: 'eclipse-temurin:17-jdk-alpine',
         command: (path, inputPath, buildDir) => {
-            const jvmOpts = '-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xms64m -Xmx256m -XX:ReservedCodeCacheSize=32m -XX:InitialCodeCacheSize=16m -XX:+UseStringDeduplication -XX:+OptimizeStringConcat';
-            const kotlinOpts = '-Xjvm-default=all -Xno-param-assertions -Xno-call-assertions -Xno-receiver-assertions';
+            const jvmOpts =
+                '-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xms64m -Xmx256m -XX:ReservedCodeCacheSize=32m -XX:InitialCodeCacheSize=16m -XX:+UseStringDeduplication -XX:+OptimizeStringConcat';
+            const kotlinOpts =
+                '-Xjvm-default=all -Xno-param-assertions -Xno-call-assertions -Xno-receiver-assertions';
             if (inputPath) {
                 const tmpInputPath = '/tmp/input.txt';
                 return `cd /tmp && export JAVA_TOOL_OPTIONS="${jvmOpts}" && if [ ! -f /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ]; then cd /tmp && (busybox wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip || wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -O kotlin.zip) && jar xf kotlin.zip && mkdir -p /opt/kotlin && mv kotlinc /opt/kotlin; fi && mkdir -p ${buildDir}/out && java ${jvmOpts} -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar ${kotlinOpts} -d ${buildDir}/out "${path}" 2>&1 && cp "${inputPath}" "${tmpInputPath}" && java ${jvmOpts} -cp "${buildDir}/out:/opt/kotlin/kotlinc/lib/*" CodeKt < "${tmpInputPath}" 2>&1`;
@@ -255,4 +257,3 @@ module.exports = {
     DOCKER_PULL_MESSAGES,
     DEBUG_PATTERNS
 };
-

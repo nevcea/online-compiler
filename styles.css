@@ -64,7 +64,9 @@ body {
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: 'kern' 1, 'liga' 1;
+    font-feature-settings:
+        'kern' 1,
+        'liga' 1;
     text-rendering: optimizeLegibility;
 }
 
@@ -354,32 +356,32 @@ header h1 {
     .settings-layout {
         padding: 1.5rem 0;
     }
-    
+
     .settings-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 1rem;
         margin-bottom: 2rem;
     }
-    
+
     .settings-header h2 {
         font-size: 1.25rem;
     }
-    
+
     .settings-section {
         padding: 1.25rem;
     }
-    
+
     .settings-section h3 {
         font-size: 0.9375rem;
         margin-bottom: 1.25rem;
     }
-    
+
     .settings-item {
         gap: 0.75rem;
         margin-bottom: 1.5rem;
     }
-    
+
     .font-select-wrapper,
     .theme-select-wrapper,
     .lang-select-wrapper {
@@ -1186,9 +1188,9 @@ tr:hover {
     min-height: calc(100vh - 180px);
     height: auto;
     grid-template-areas:
-        "language language"
-        "editor output"
-        "actions actions";
+        'language language'
+        'editor output'
+        'actions actions';
     align-items: start;
 }
 
@@ -1205,10 +1207,10 @@ tr:hover {
     .compiler-layout {
         grid-template-columns: 1fr;
         grid-template-areas:
-            "language"
-            "editor"
-            "actions"
-            "output";
+            'language'
+            'editor'
+            'actions'
+            'output';
         gap: 1.25rem;
     }
 }
@@ -1249,7 +1251,7 @@ tr:hover {
         gap: 0.75rem;
         padding: 1rem;
     }
-    
+
     .language-selector label {
         font-size: 0.875rem;
     }
@@ -1359,7 +1361,6 @@ tr:hover {
     backdrop-filter: blur(12px);
     background: rgba(26, 26, 26, 0.95);
 }
-
 
 .custom-select-dropdown.show {
     display: block;
@@ -1529,7 +1530,7 @@ tr:hover {
     .editor-wrapper {
         min-height: 300px;
     }
-    
+
     #code-editor {
         min-height: 300px;
     }
@@ -1797,7 +1798,7 @@ tr:hover {
         gap: 0.75rem;
         padding: 0.5rem 0;
     }
-    
+
     .action-buttons button {
         width: 100%;
         justify-content: center;
@@ -1874,11 +1875,11 @@ tr:hover {
         flex-wrap: wrap;
         gap: 0.5rem;
     }
-    
+
     .output-title {
         font-size: 0.8rem;
     }
-    
+
     .clear-output-btn {
         font-size: 0.8rem;
         padding: 0.35rem 0.65rem;
@@ -2059,11 +2060,11 @@ tr:hover {
         padding: 0.875rem 1rem;
         gap: 0.5rem;
     }
-    
+
     .console-prompt {
         font-size: 13px;
     }
-    
+
     .console-input {
         font-size: 13px;
     }
@@ -2157,7 +2158,7 @@ tr:hover {
     header h1 {
         font-size: 1.25rem;
     }
-    
+
     .header-content {
         flex-wrap: wrap;
         gap: 0.5rem;
