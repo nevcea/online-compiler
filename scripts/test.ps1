@@ -1,20 +1,31 @@
-# 테스트 실행 스크립트 (PowerShell)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Assert-LastExitCode {
+    param([string]$Step)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Step failed: $Step (exit code $LASTEXITCODE)"
+    }
+}
 
 Write-Host "Running tests..." -ForegroundColor Cyan
 
-# ESLint 검사
 Write-Host "Running ESLint..." -ForegroundColor Blue
 npm run lint
+Assert-LastExitCode "npm run lint"
 
-# 포맷팅 검사
 Write-Host "Checking code formatting..." -ForegroundColor Blue
 npm run format:check
+Assert-LastExitCode "npm run format:check"
 
-# Backend ESLint
 Write-Host "Running backend ESLint..." -ForegroundColor Blue
-Set-Location backend
-npx eslint server.js
-Set-Location ..
+Push-Location backend
+try {
+    npx eslint server.js
+    Assert-LastExitCode "npx eslint backend/server.js"
+} finally {
+    Pop-Location
+}
 
 Write-Host "[OK] All checks passed!" -ForegroundColor Green
 

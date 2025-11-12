@@ -43,6 +43,12 @@ export default [
         }
     },
     {
+        files: ['scripts/**/*.cjs'],
+        rules: {
+            indent: 'off'
+        }
+    },
+    {
         ignores: [
             'node_modules/**',
             'backend/node_modules/**',

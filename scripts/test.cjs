@@ -5,11 +5,20 @@ const path = require('path');
 
 const isWindows = process.platform === 'win32';
 const rootDir = path.join(__dirname, '..');
+const args = process.argv.slice(2);
+
+function quoteArg(arg) {
+	if (/[\s"]/g.test(arg)) {
+		return `"${arg.replace(/"/g, '\\"')}"`;
+	}
+	return arg;
+}
 
 try {
     if (isWindows) {
         const scriptPath = path.join(__dirname, 'test.ps1');
-        execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}"`, {
+		const forwarded = args.map(quoteArg).join(' ');
+		execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" ${forwarded}`, {
             stdio: 'inherit',
             cwd: rootDir
         });

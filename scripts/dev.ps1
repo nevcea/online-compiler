@@ -1,8 +1,24 @@
-# 개발 환경 시작 스크립트 (PowerShell)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Assert-LastExitCode {
+    param([string]$Step)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Step failed: $Step (exit code $LASTEXITCODE)"
+    }
+}
+
+function Resolve-DockerCompose {
+    if (docker compose version 2>$null) {
+        return @{ Exe = 'docker'; Args = @('compose') }
+    } elseif (Get-Command docker-compose -ErrorAction SilentlyContinue) {
+        return @{ Exe = 'docker-compose'; Args = @() }
+    } else {
+        throw 'Docker Compose is not installed. Please install Docker Desktop or docker-compose.'
+    }
+}
 
 Write-Host "Starting development environment..." -ForegroundColor Cyan
-
-# 의존성 확인
 Write-Host "Checking dependencies..." -ForegroundColor Blue
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -15,25 +31,32 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# 의존성 설치
 Write-Host "Installing dependencies..." -ForegroundColor Blue
 npm install
-Set-Location backend
-npm install
-Set-Location ..
+Assert-LastExitCode "npm install (root)"
+Push-Location backend
+try {
+    npm install
+    Assert-LastExitCode "npm install (backend)"
+} finally {
+    Pop-Location
+}
 
-# Docker 이미지 빌드
 Write-Host "Building Docker images..." -ForegroundColor Blue
-docker-compose build
+$compose = Resolve-DockerCompose
+$buildArgs = $compose.Args + @('build')
+& $compose.Exe @buildArgs
+Assert-LastExitCode "docker compose build"
 
-# 개발 서버 시작
 Write-Host "[OK] Starting services..." -ForegroundColor Green
-docker-compose up -d
+$upArgs = $compose.Args + @('up','-d')
+& $compose.Exe @upArgs
+Assert-LastExitCode "docker compose up -d"
 
 Write-Host "[OK] Development environment is ready!" -ForegroundColor Green
 Write-Host "Frontend: http://localhost:8080" -ForegroundColor Cyan
 Write-Host "Backend API: http://localhost:3000" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "To stop services: docker-compose down" -ForegroundColor Yellow
-Write-Host "To view logs: docker-compose logs -f" -ForegroundColor Yellow
+Write-Host "To stop services: docker compose down" -ForegroundColor Yellow
+Write-Host "To view logs: docker compose logs -f" -ForegroundColor Yellow
 
