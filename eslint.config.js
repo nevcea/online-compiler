@@ -1,7 +1,23 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
+    {
+        ignores: [
+            'node_modules/**',
+            'backend/node_modules/**',
+            'frontend/node_modules/**',
+            'backend/code/**',
+            'backend/output/**',
+            'dist/**',
+            'frontend/dist/**',
+            'build/**',
+            '*.min.js',
+            'coverage/**'
+        ]
+    },
     js.configs.recommended,
     {
         languageOptions: {
@@ -66,17 +82,32 @@ export default [
         }
     },
     {
-        ignores: [
-            'node_modules/**',
-            'backend/node_modules/**',
-            'frontend/node_modules/**',
-            'backend/code/**',
-            'backend/output/**',
-            'dist/**',
-            'frontend/dist/**',
-            'build/**',
-            '*.min.js',
-            'coverage/**'
-        ]
+        files: ['frontend/**/*.{js,jsx}'],
+        languageOptions: {
+            globals: globals.browser,
+            parserOptions: {
+                ecmaVersion: 'latest',
+                ecmaFeatures: { jsx: true },
+                sourceType: 'module'
+            }
+        },
+        plugins: {
+            'react-hooks': reactHooks,
+            'react-refresh': reactRefresh
+        },
+        rules: {
+            ...reactHooks.configs.recommended.rules,
+            'react-refresh/only-export-components': [
+                'warn',
+                { allowConstantExport: true, allowExportNames: ['useApp'] }
+            ],
+            'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }]
+        }
+    },
+    {
+        files: ['frontend/src/context/AppContext.jsx'],
+        rules: {
+            'react-refresh/only-export-components': 'off'
+        }
     }
 ];
