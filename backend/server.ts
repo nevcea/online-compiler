@@ -57,7 +57,7 @@ ensureDirectories(codeDir, outputDir, toolCacheDir, kotlinCacheDir, kotlinBuilds
             warmupContainers(kotlinCacheDir);
         }
     })
-    .catch((e) => {
+    .catch((e: unknown) => {
         console.error('Startup error:', e);
         app.listen(CONFIG.PORT, () => {
             console.log(`Server running on port ${CONFIG.PORT}`);

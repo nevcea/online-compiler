@@ -52,7 +52,7 @@ try {
 			allPassed = false;
 		}
 
-		if (!runCommand('npx eslint server.js -c ../eslint.config.js',
+		if (!runCommand('npx eslint server.ts -c ../eslint.config.js',
 		                path.join(rootDir, 'backend'),
 		                'Running backend ESLint')) {
 			allPassed = false;

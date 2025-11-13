@@ -4,6 +4,11 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export default [
     {
@@ -115,7 +120,7 @@ export default [
                 ecmaVersion: 'latest',
                 ecmaFeatures: { jsx: true },
                 sourceType: 'module',
-                project: './frontend/tsconfig.json'
+                project: resolve(__dirname, 'frontend/tsconfig.json')
             }
         },
         plugins: {
@@ -133,7 +138,7 @@ export default [
             parserOptions: {
                 ecmaVersion: 'latest',
                 sourceType: 'module',
-                project: './frontend/tsconfig.node.json'
+                project: resolve(__dirname, 'frontend/tsconfig.node.json')
             }
         },
         plugins: {

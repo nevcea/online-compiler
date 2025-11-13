@@ -39,7 +39,7 @@ jobs:
 
             - name: Check backend code
               working-directory: ./backend
-              run: npx eslint server.js || echo "Backend lint check completed"
+              run: npx eslint server.ts -c ../eslint.config.js || echo "Backend lint check completed"
 
     test:
         name: Test

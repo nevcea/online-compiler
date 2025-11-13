@@ -49,7 +49,7 @@ if (-not (Run-Command -Command "npm run lint" -Cwd (Join-Path $PSScriptRoot ".."
     $allPassed = $false
 }
 
-if (-not (Run-Command -Command "npx eslint server.js -c ../eslint.config.js" -Cwd (Join-Path $PSScriptRoot "..\backend") -Description "Running backend ESLint")) {
+if (-not (Run-Command -Command "npx eslint server.ts -c ../eslint.config.js" -Cwd (Join-Path $PSScriptRoot "..\backend") -Description "Running backend ESLint")) {
     $allPassed = $false
 }
 
