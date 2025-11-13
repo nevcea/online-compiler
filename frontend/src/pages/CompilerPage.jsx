@@ -55,6 +55,13 @@ const CompilerPage = () => {
             const formattedOutput = formatOutput(result.output || '');
             const formattedError = formatError(result.error || '');
             
+            if (result.error && result.error.trim()) {
+                showToast(result.error, 'error', 5000);
+                setError('');
+            } else {
+                setError(formattedError);
+            }
+            
             if (result.images && result.images.length > 0) {
                 setOutput({
                     text: formattedOutput,
@@ -63,25 +70,24 @@ const CompilerPage = () => {
             } else {
                 setOutput(formattedOutput);
             }
-            setError(formattedError);
         } catch (err) {
             setExecutionTime(Date.now() - startTime);
             let userMessage = t('connection-error');
             let errorType = 'error';
             if (err.message) {
-                const msg = err.message.toLowerCase();
-                if (msg.includes('failed to fetch') || msg.includes('network')) {
-                    userMessage = t('cannot-connect-server');
-                } else if (msg.includes('timeout')) {
-                    userMessage = t('request-timeout');
-                } else if (msg.includes('400')) {
-                    userMessage = t('bad-request');
-                } else if (msg.includes('500')) {
-                    userMessage = t('server-error');
+                const match = err.message.match(/HTTP \d+: (.+)/);
+                if (match && match[1]) {
+                    userMessage = match[1];
                 } else {
-                    const match = err.message.match(/HTTP \d+: (.+)/);
-                    if (match && match[1]) {
-                        userMessage = match[1];
+                    const msg = err.message.toLowerCase();
+                    if (msg.includes('failed to fetch') || msg.includes('network')) {
+                        userMessage = t('cannot-connect-server');
+                    } else if (msg.includes('timeout')) {
+                        userMessage = t('request-timeout');
+                    } else if (msg.includes('400')) {
+                        userMessage = t('bad-request');
+                    } else if (msg.includes('500')) {
+                        userMessage = t('server-error');
                     }
                 }
             }
