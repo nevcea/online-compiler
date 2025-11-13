@@ -1,14 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const { exec, spawn } = require('child_process');
-const fs = require('fs').promises;
-const fss = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { promisify } = require('util');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const {
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import { exec, spawn } from 'child_process';
+import { promises as fs } from 'fs';
+import * as fss from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { promisify } from 'util';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import {
     CONFIG,
     TMPFS_SIZES,
     CONTAINER_CODE_PATHS,
@@ -20,8 +20,9 @@ const {
     DOCKER_PULL_MESSAGES,
     DEBUG_PATTERNS,
     KOTLIN_DOWNLOAD_CMD,
-    KOTLIN_COMPILER_CHECK
-} = require('./config');
+    KOTLIN_COMPILER_CHECK,
+    LanguageConfig
+} from './config';
 
 const app = express();
 
@@ -31,12 +32,46 @@ const toolCacheDir = path.join(__dirname, 'tool_cache');
 const kotlinCacheDir = path.join(toolCacheDir, 'kotlin');
 const kotlinBuildsDir = path.join(toolCacheDir, 'kotlin_builds');
 
+// Performance optimizations: Cache compiled regexes and normalized paths
+const ESC = String.fromCharCode(27);
+const ANSI_REGEX = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+const DOCKER_PULL_MESSAGES_SET = new Set(DOCKER_PULL_MESSAGES.map((msg) => msg.toLowerCase()));
+const ALLOWED_LANGUAGES_SET = new Set(ALLOWED_LANGUAGES.map((lang) => lang.toLowerCase()));
+const ALLOWED_IMAGES_SET = new Set(ALLOWED_IMAGES);
+const FILE_PATH_REGEX = /\/[^\s]+/g;
+const WINDOWS_PATH_REGEX = /[A-Z]:\\[^\s]+/gi;
+const STACK_TRACE_REGEX = /(.*?)(\n\s+at\s+.*)/s;
+const FILE_PATH_PLACEHOLDER_REGEX = /^\[file path\]$/;
+const DEBUG_PREFIX_REGEX = /^\[DEBUG\]|^DEBUG:/;
+
+// Cache normalized codeDir path
+let cachedCodeDirNormalized: string | null = null;
+const getCodeDirNormalized = (): string => {
+    if (cachedCodeDirNormalized === null) {
+        const resolved = path.resolve(codeDir);
+        cachedCodeDirNormalized = process.platform === 'win32' ? resolved.replace(/\\/g, '/') : resolved;
+    }
+    return cachedCodeDirNormalized;
+};
+
+// Cache Docker image existence checks (TTL: 5 minutes)
+interface ImageCacheEntry {
+    exists: boolean;
+    timestamp: number;
+}
+const imageExistenceCache = new Map<string, ImageCacheEntry>();
+const IMAGE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache kotlin compiler path check
+let kotlinCompilerPathCache: { exists: boolean; timestamp: number } | null = null;
+const KOTLIN_CACHE_TTL = 60 * 1000; // 1 minute
+
 app.disable('x-powered-by');
 if (CONFIG.TRUST_PROXY) {
     app.set('trust proxy', 1);
 }
 
-async function isDockerAvailable() {
+async function isDockerAvailable(): Promise<boolean> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONFIG.DOCKER_CHECK_TIMEOUT);
     try {
@@ -49,16 +84,23 @@ async function isDockerAvailable() {
     }
 }
 
-function kotlinCompilerExistsOnHost() {
+function kotlinCompilerExistsOnHost(): boolean {
+    const now = Date.now();
+    if (kotlinCompilerPathCache && (now - kotlinCompilerPathCache.timestamp) < KOTLIN_CACHE_TTL) {
+        return kotlinCompilerPathCache.exists;
+    }
     try {
         const p = path.join(kotlinCacheDir, 'kotlinc', 'lib', 'kotlin-compiler.jar');
-        return fss.existsSync(p);
+        const exists = fss.existsSync(p);
+        kotlinCompilerPathCache = { exists, timestamp: now };
+        return exists;
     } catch {
+        kotlinCompilerPathCache = { exists: false, timestamp: now };
         return false;
     }
 }
 
-async function warmupKotlinOnStart() {
+async function warmupKotlinOnStart(): Promise<void> {
     if (kotlinCompilerExistsOnHost()) {
         return;
     }
@@ -80,12 +122,12 @@ app.use(
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .map((s: string) => s.trim())
+    .filter((s: string) => s.length > 0);
 const isProduction = (process.env.NODE_ENV || '').toLowerCase() === 'production';
 const devLocalhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
-const corsOptions = {
-    origin: (origin, callback) => {
+const corsOptions: cors.CorsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         if (!origin) {
             return callback(null, true);
         }
@@ -111,7 +153,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === 'OPTIONS') {
         const origin = req.headers.origin || '';
         let allowed = false;
@@ -126,7 +168,8 @@ app.use((req, res, next) => {
             allowed = true;
         }
         if (!allowed) {
-            return res.status(403).send('Not allowed by CORS');
+            res.status(403).send('Not allowed by CORS');
+            return;
         }
         res.header('Access-Control-Allow-Origin', origin || '*');
         res.header('Vary', 'Origin');
@@ -136,7 +179,8 @@ app.use((req, res, next) => {
             'Access-Control-Allow-Headers',
             req.headers['access-control-request-headers'] || 'Content-Type, Authorization'
         );
-        return res.sendStatus(204);
+        res.sendStatus(204);
+        return;
     }
     next();
 });
@@ -158,21 +202,21 @@ const healthLimiter = rateLimit({
     legacyHeaders: false
 });
 
-function validateLanguage(language) {
+function validateLanguage(language: unknown): language is string {
     if (typeof language !== 'string') {
         return false;
     }
-    return ALLOWED_LANGUAGES.includes(language.toLowerCase());
+    return ALLOWED_LANGUAGES_SET.has(language.toLowerCase());
 }
 
-function validateImage(image) {
+function validateImage(image: unknown): image is string {
     if (typeof image !== 'string') {
         return false;
     }
-    return ALLOWED_IMAGES.includes(image);
+    return ALLOWED_IMAGES_SET.has(image);
 }
 
-function normalizePath(filePath) {
+function normalizePath(filePath: unknown): string | null {
     if (typeof filePath !== 'string') {
         return null;
     }
@@ -183,22 +227,27 @@ function normalizePath(filePath) {
     return resolved;
 }
 
-function validatePath(filePath) {
+function validatePath(filePath: unknown): boolean {
     const normalized = normalizePath(filePath);
     if (!normalized) {
         return false;
     }
-    const codeDirNormalized = normalizePath(codeDir);
-    if (!codeDirNormalized) {
-        return false;
-    }
+    const codeDirNormalized = getCodeDirNormalized();
     return normalized.startsWith(codeDirNormalized);
 }
 
-async function checkImageExists(image) {
+async function checkImageExists(image: string): Promise<boolean> {
     if (!validateImage(image)) {
         return false;
     }
+    
+    // Check cache first
+    const now = Date.now();
+    const cached = imageExistenceCache.get(image);
+    if (cached && (now - cached.timestamp) < IMAGE_CACHE_TTL) {
+        return cached.exists;
+    }
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     try {
@@ -206,14 +255,23 @@ async function checkImageExists(image) {
             signal: controller.signal
         });
         clearTimeout(timeoutId);
-        return stdout.trim().length > 0;
+        const exists = stdout.trim().length > 0;
+        imageExistenceCache.set(image, { exists, timestamp: now });
+        return exists;
     } catch {
         clearTimeout(timeoutId);
+        imageExistenceCache.set(image, { exists: false, timestamp: now });
         return false;
     }
 }
 
-async function pullDockerImage(image, retries = CONFIG.DOCKER_PULL_RETRIES) {
+interface PullResult {
+    success: boolean;
+    image: string;
+    error?: string;
+}
+
+async function pullDockerImage(image: string, retries: number = CONFIG.DOCKER_PULL_RETRIES): Promise<PullResult> {
     if (!validateImage(image)) {
         return { success: false, image, error: 'Invalid image' };
     }
@@ -225,16 +283,16 @@ async function pullDockerImage(image, retries = CONFIG.DOCKER_PULL_RETRIES) {
 
             const pullProcess = exec(`docker pull ${image}`, { signal: controller.signal });
 
-            pullProcess.stdout?.on('data', (data) => {
+            pullProcess.stdout?.on('data', (data: Buffer | string) => {
                 process.stdout.write(`[${image}] ${data.toString().trim()}\n`);
             });
 
-            pullProcess.stderr?.on('data', (data) => {
+            pullProcess.stderr?.on('data', (data: Buffer | string) => {
                 process.stderr.write(`[${image}] ${data.toString().trim()}\n`);
             });
 
-            await new Promise((resolve, reject) => {
-                pullProcess.on('close', (code) => {
+            await new Promise<void>((resolve, reject) => {
+                pullProcess.on('close', (code: number | null) => {
                     if (code === 0) {
                         resolve();
                     } else {
@@ -252,13 +310,15 @@ async function pullDockerImage(image, retries = CONFIG.DOCKER_PULL_RETRIES) {
                 console.log(`[${image}] Pull failed, retrying... (${attempt + 1}/${retries})`);
                 await new Promise((resolve) => setTimeout(resolve, delay));
             } else {
-                return { success: false, image, error: error.message || 'Unknown error' };
+                const err = error as Error;
+                return { success: false, image, error: err.message || 'Unknown error' };
             }
         }
     }
+    return { success: false, image, error: 'Max retries exceeded' };
 }
 
-async function preloadDockerImages() {
+async function preloadDockerImages(): Promise<void> {
     if (!(await isDockerAvailable())) {
         console.warn(
             '[PRELOAD] Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)'
@@ -294,7 +354,7 @@ async function preloadDockerImages() {
 
     console.log(`[PRELOAD] Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
 
-    const results = [];
+    const results: PullResult[] = [];
 
     for (let i = 0; i < imagesToPull.length; i += CONFIG.PRELOAD_BATCH_SIZE) {
         const batch = imagesToPull.slice(i, i + CONFIG.PRELOAD_BATCH_SIZE);
@@ -325,13 +385,37 @@ async function preloadDockerImages() {
     );
 }
 
-async function runDockerCommand(image, command, tmpfsSize, timeout = 10000, allowNetwork = false) {
+interface DockerCommandResult {
+    stdout: string;
+    stderr: string;
+    elapsed: number;
+}
+
+interface DockerCommandError {
+    error: {
+        message: string;
+        code?: string | number;
+        signal?: string | null;
+        killed?: boolean;
+        stderr: string;
+        stdout: string;
+    };
+    elapsed: number;
+}
+
+async function runDockerCommand(
+    image: string,
+    command: string,
+    tmpfsSize: string,
+    timeout: number = 10000,
+    allowNetwork: boolean = false
+): Promise<DockerCommandResult> {
     if (!validateImage(image) || typeof command !== 'string' || typeof tmpfsSize !== 'string') {
         throw new Error('Invalid parameters');
     }
     const escapedCommand = command.replace(/'/g, "'\\''").replace(/"/g, '\\"');
     const networkFlag = allowNetwork ? '' : '--network=none ';
-    const mounts = [];
+    const mounts: string[] = [];
     if (allowNetwork) {
         try {
             const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
@@ -357,19 +441,28 @@ async function runDockerCommand(image, command, tmpfsSize, timeout = 10000, allo
     } catch (error) {
         clearTimeout(timeoutId);
         const elapsed = Date.now() - startTime;
-        const errorInfo = {
-            message: error.message || 'Unknown error',
-            code: error.code,
-            signal: error.signal,
-            killed: error.killed,
-            stderr: error.stderr || '',
-            stdout: error.stdout || ''
+        const err = error as { message?: string; code?: string | number; signal?: string | null; killed?: boolean; stderr?: string; stdout?: string };
+        const errorInfo: DockerCommandError['error'] = {
+            message: err.message || 'Unknown error',
+            code: err.code,
+            signal: err.signal || null,
+            killed: err.killed,
+            stderr: err.stderr || '',
+            stdout: err.stdout || ''
         };
-        throw { error: errorInfo, elapsed };
+        throw { error: errorInfo, elapsed } as DockerCommandError;
     }
 }
 
-function getWarmupConfigs() {
+interface WarmupConfig {
+    language: string;
+    image: string;
+    command: string;
+    tmpfsSize: string;
+    timeout: number;
+}
+
+function getWarmupConfigs(): WarmupConfig[] {
     return [
         {
             language: 'python',
@@ -495,7 +588,15 @@ function getWarmupConfigs() {
     ];
 }
 
-async function warmupContainer(config) {
+interface WarmupResult {
+    success: boolean;
+    language: string;
+    error?: string;
+    elapsed?: number;
+    fullError?: unknown;
+}
+
+async function warmupContainer(config: WarmupConfig): Promise<WarmupResult> {
     try {
         let retries = 3;
         let imageExists = false;
@@ -536,11 +637,12 @@ async function warmupContainer(config) {
 
         return { success: true, language: config.language, elapsed: result.elapsed };
     } catch (error) {
-        const errorInfo = error?.error || {};
-        let errorMessage = errorInfo.message || error?.message || 'Unknown error';
+        const dockerError = error as DockerCommandError;
+        const errorInfo = dockerError?.error || {};
+        let errorMessage = errorInfo.message || (error as Error)?.message || 'Unknown error';
 
         if (
-            error.name === 'AbortError' ||
+            (error as Error).name === 'AbortError' ||
             errorMessage.includes('aborted') ||
             errorMessage.includes('The operation was aborted')
         ) {
@@ -552,7 +654,7 @@ async function warmupContainer(config) {
             errorInfo.stderr &&
             errorInfo.stderr.includes('kotlinc-jvm')
         ) {
-            return { success: true, language: config.language, elapsed: error?.elapsed || 0 };
+            return { success: true, language: config.language, elapsed: dockerError?.elapsed || 0 };
         }
 
         if (errorInfo.stderr && errorInfo.stderr.trim()) {
@@ -574,7 +676,7 @@ async function warmupContainer(config) {
     }
 }
 
-async function warmupAllContainers() {
+async function warmupAllContainers(): Promise<void> {
     if (!(await isDockerAvailable())) {
         console.warn('[WARMUP] Docker is not available. Skipping container warmup.');
         return;
@@ -583,7 +685,7 @@ async function warmupAllContainers() {
     console.log(`[WARMUP] Warming up ${configs.length} containers...`);
     const startTime = Date.now();
 
-    const results = [];
+    const results: WarmupResult[] = [];
 
     for (let i = 0; i < configs.length; i += CONFIG.WARMUP_BATCH_SIZE) {
         const batch = configs.slice(i, i + CONFIG.WARMUP_BATCH_SIZE);
@@ -645,7 +747,7 @@ async function warmupAllContainers() {
     }
 }
 
-function warmupContainers() {
+function warmupContainers(): void {
     warmupAllContainers().catch((error) => {
         console.error('Initial warmup error:', error);
     });
@@ -668,7 +770,7 @@ function warmupContainers() {
     }, 60000);
 }
 
-async function ensureDirectories() {
+async function ensureDirectories(): Promise<void> {
     try {
         await fs.mkdir(codeDir, { recursive: true });
         await fs.mkdir(outputDir, { recursive: true });
@@ -680,7 +782,7 @@ async function ensureDirectories() {
     }
 }
 
-function sanitizeCode(code) {
+function sanitizeCode(code: unknown): void {
     if (typeof code !== 'string') {
         throw new Error('Invalid code format');
     }
@@ -696,34 +798,51 @@ function sanitizeCode(code) {
     }
 }
 
-function filterDockerMessages(text) {
+function filterDockerMessages(text: unknown): string {
     if (!text || typeof text !== 'string') {
         return '';
     }
-    const ESC = String.fromCharCode(27);
-    const ansiRegex = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
-    const withoutAnsi = text.replace(ansiRegex, '');
+    const withoutAnsi = text.replace(ANSI_REGEX, '');
 
-    return withoutAnsi
-        .split('\n')
-        .filter((line) => {
-            const lower = line.toLowerCase();
-            if (DOCKER_PULL_MESSAGES.some((msg) => lower.includes(msg))) {
-                return false;
+    const lines = withoutAnsi.split('\n');
+    const filtered: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const lower = line.toLowerCase();
+        let shouldInclude = true;
+        
+        // Fast check using Set
+        for (const msg of DOCKER_PULL_MESSAGES_SET) {
+            if (lower.includes(msg)) {
+                shouldInclude = false;
+                break;
             }
-            if (DEBUG_PATTERNS.some((pattern) => pattern.test(line.trim()))) {
-                return false;
+        }
+        
+        if (shouldInclude) {
+            const trimmed = line.trim();
+            for (const pattern of DEBUG_PATTERNS) {
+                if (pattern.test(trimmed)) {
+                    shouldInclude = false;
+                    break;
+                }
             }
-            return true;
-        })
-        .join('\n');
+        }
+        
+        if (shouldInclude) {
+            filtered.push(line);
+        }
+    }
+    
+    return filtered.join('\n');
 }
 
-function sanitizeError(error) {
+function sanitizeError(error: unknown): string {
     if (!error) {
         return 'An error occurred';
     }
-    const errorStr = typeof error === 'string' ? error : error.message || String(error);
+    const errorStr = typeof error === 'string' ? error : (error as Error).message || String(error);
     const filtered = filterDockerMessages(errorStr);
     if (filtered.length > 500) {
         return filtered.substring(0, 500) + '...';
@@ -731,39 +850,190 @@ function sanitizeError(error) {
     return filtered;
 }
 
-function sanitizeErrorForUser(errorStr) {
+function sanitizeErrorForUser(errorStr: unknown): string {
     if (!errorStr || typeof errorStr !== 'string') {
         return 'An error occurred during execution.';
     }
 
+    // Log original error for debugging
+    console.error('[DEBUG] Original error message:', errorStr.substring(0, 500));
+
+    // Work with original error first before filtering
+    const originalLower = errorStr.toLowerCase();
+    
     let sanitized = filterDockerMessages(errorStr);
 
+    // Check for Docker-specific errors and provide user-friendly messages
+    const lowerSanitized = sanitized.toLowerCase();
+    
+    // Check for Docker daemon connection errors first
+    if (lowerSanitized.includes("cannot connect to the docker daemon") || 
+        lowerSanitized.includes("is the docker daemon running") ||
+        (lowerSanitized.includes("docker daemon") && lowerSanitized.includes("not running"))) {
+        return 'Docker가 실행되지 않았습니다. Docker Desktop을 시작한 후 다시 시도해주세요.';
+    }
+    
+    // Check for Docker not found errors
+    if (lowerSanitized.includes("'docker' is not recognized") || 
+        lowerSanitized.includes("docker: command not found") ||
+        lowerSanitized.includes("spawn docker enoent")) {
+        return 'Docker가 설치되지 않았습니다. Docker를 설치한 후 다시 시도해주세요.';
+    }
+    
+    // Check for image errors
+    if (lowerSanitized.includes("no such image") || 
+        lowerSanitized.includes("pull access denied") ||
+        lowerSanitized.includes("repository does not exist")) {
+        return 'Docker 이미지를 찾을 수 없습니다. 필요한 이미지를 다운로드 중입니다. 잠시 후 다시 시도해주세요.';
+    }
+    
+    // Check for permission errors
+    if (lowerSanitized.includes("permission denied") && lowerSanitized.includes("docker")) {
+        return 'Docker 권한 오류가 발생했습니다. Docker 권한을 확인해주세요.';
+    }
+    
+    // Check for invalid reference format (usually means bad image name or command syntax)
+    if (lowerSanitized.includes("docker: invalid reference format") ||
+        lowerSanitized.includes("invalid reference format")) {
+        return 'Docker 명령어 형식 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    }
+    
+    // Check for "Run 'docker run --help'" - this usually means command syntax error
+    if (lowerSanitized.includes("run 'docker run --help'") || 
+        (lowerSanitized.includes("run 'docker") && lowerSanitized.includes("--help")) ||
+        originalLower.includes("run 'docker run --help'") ||
+        (originalLower.includes("run 'docker") && originalLower.includes("--help"))) {
+        
+        // Work with original error string first to extract actual error
+        const originalLines = errorStr.split('\n');
+        
+        // Try to extract the actual error before the help message from original
+        for (let i = 0; i < originalLines.length; i++) {
+            const line = originalLines[i].trim();
+            const lineLower = line.toLowerCase();
+            
+            // Stop when we hit the help message
+            if (lineLower.includes("run 'docker") && lineLower.includes("--help")) {
+                break;
+            }
+            
+            // Skip empty lines and help-related text
+            if (!line || 
+                lineLower.includes("for more information") ||
+                lineLower.includes("see 'docker") ||
+                line.length < 5) {
+                continue;
+            }
+            
+            // Look for error patterns in original message
+            const errorPatterns = [
+                /docker:\s*(.+?)(?:\n|$)/i,
+                /error[:\s]+(.+?)(?:\n|$)/i,
+                /invalid[:\s]+(.+?)(?:\n|$)/i,
+                /unknown[:\s]+(.+?)(?:\n|$)/i,
+                /failed[:\s]+(.+?)(?:\n|$)/i,
+                /cannot[:\s]+(.+?)(?:\n|$)/i
+            ];
+            
+            for (const pattern of errorPatterns) {
+                const match = line.match(pattern);
+                if (match && match[1]) {
+                    const errorMsg = match[1].trim();
+                    if (errorMsg.length > 0 && errorMsg.length < 200) {
+                        // Clean up the error message
+                        const cleaned = errorMsg.replace(/^docker:\s*/i, '').trim();
+                        if (cleaned.length > 0) {
+                            return cleaned;
+                        }
+                    }
+                }
+            }
+            
+            // If line looks like an error message, return it
+            if (lineLower.includes('error') || 
+                lineLower.includes('invalid') ||
+                lineLower.includes('unknown') ||
+                lineLower.includes('failed') ||
+                lineLower.includes('cannot') ||
+                lineLower.includes('docker:')) {
+                // Clean up docker: prefix
+                const cleaned = line.replace(/^docker:\s*/i, '').trim();
+                if (cleaned.length > 5 && cleaned.length < 200) {
+                    return cleaned;
+                }
+            }
+        }
+        
+        // Fallback: try with sanitized version
+        const beforeHelp = errorStr.split(/run ['"]docker/i)[0].trim();
+        if (beforeHelp && beforeHelp.length > 0) {
+            const beforeLines = beforeHelp.split('\n').filter(l => l.trim().length > 0);
+            if (beforeLines.length > 0) {
+                // Get the last meaningful line
+                for (let i = beforeLines.length - 1; i >= 0; i--) {
+                    const lastLine = beforeLines[i].trim();
+                    if (lastLine.length > 5 && lastLine.length < 200) {
+                        const cleaned = lastLine.replace(/^docker:\s*/i, '').trim();
+                        if (cleaned.length > 0) {
+                            return cleaned;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Last resort: return first non-empty line from original
+        for (const line of originalLines) {
+            const trimmed = line.trim();
+            if (trimmed && 
+                !trimmed.toLowerCase().includes("run 'docker") &&
+                !trimmed.toLowerCase().includes("for more information") &&
+                trimmed.length > 5 && 
+                trimmed.length < 200) {
+                const cleaned = trimmed.replace(/^docker:\s*/i, '').trim();
+                if (cleaned.length > 0) {
+                    return cleaned;
+                }
+            }
+        }
+        
+        return 'Docker 명령어 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    }
+
+    // Use compiled regexes
     sanitized = sanitized.replace(/docker:.*/gi, '');
     sanitized = sanitized.replace(/Error response from daemon.*/gi, '');
+    sanitized = sanitized.replace(/Run 'docker run --help'.*/gi, '');
+    sanitized = sanitized.replace(FILE_PATH_REGEX, '[file path]');
+    sanitized = sanitized.replace(WINDOWS_PATH_REGEX, '[file path]');
 
-    sanitized = sanitized.replace(/\/[^\s]+/g, '[file path]');
-    sanitized = sanitized.replace(/[A-Z]:\\[^\s]+/gi, '[file path]');
-
-    const stackTraceMatch = sanitized.match(/(.*?)(\n\s+at\s+.*)/s);
+    const stackTraceMatch = sanitized.match(STACK_TRACE_REGEX);
     if (stackTraceMatch) {
         sanitized = stackTraceMatch[1];
     }
 
-    const lines = sanitized.split('\n').filter((line) => {
-        const trimmed = line.trim();
+    const lines = sanitized.split('\n');
+    const filtered: string[] = [];
+    
+    for (let i = 0; i < lines.length && filtered.length < 10; i++) {
+        const trimmed = lines[i].trim();
         if (!trimmed) {
-            return false;
+            continue;
         }
-        if (trimmed.startsWith('[DEBUG]') || trimmed.startsWith('DEBUG:')) {
-            return false;
+        if (DEBUG_PREFIX_REGEX.test(trimmed)) {
+            continue;
         }
-        if (/^\[file path\]$/.test(trimmed)) {
-            return false;
+        if (FILE_PATH_PLACEHOLDER_REGEX.test(trimmed)) {
+            continue;
         }
-        return true;
-    });
+        // Filter out Docker help messages
+        if (trimmed.includes("Run 'docker") || trimmed.includes("for more information")) {
+            continue;
+        }
+        filtered.push(lines[i]);
+    }
 
-    sanitized = lines.slice(0, 10).join('\n').trim();
+    sanitized = filtered.join('\n').trim();
 
     if (sanitized.length > 300) {
         sanitized = sanitized.substring(0, 300) + '...';
@@ -776,7 +1046,7 @@ function sanitizeErrorForUser(errorStr) {
     return sanitized;
 }
 
-async function cleanupFile(filePath) {
+async function cleanupFile(filePath: string | null): Promise<void> {
     if (!filePath || !validatePath(filePath)) {
         return;
     }
@@ -787,7 +1057,7 @@ async function cleanupFile(filePath) {
     }
 }
 
-async function writeInputFile(inputPath, inputText) {
+async function writeInputFile(inputPath: string, inputText: string): Promise<string> {
     if (!validatePath(inputPath)) {
         throw new Error('Invalid input path');
     }
@@ -796,11 +1066,11 @@ async function writeInputFile(inputPath, inputText) {
     return resolvedInputPath;
 }
 
-function getContainerCodePath(language, extension) {
+function getContainerCodePath(language: string, extension: string): string {
     return CONTAINER_CODE_PATHS[language] || `/tmp/code${extension}`;
 }
 
-function convertToDockerPath(filePath) {
+function convertToDockerPath(filePath: string): string {
     const normalized = normalizePath(filePath);
     if (!normalized) {
         throw new Error('Invalid file path');
@@ -813,7 +1083,13 @@ function convertToDockerPath(filePath) {
     return normalized;
 }
 
-function buildDockerArgs(language, hostCodePath, opts = {}) {
+interface BuildOptions {
+    hasInput?: boolean;
+    inputPath?: string;
+    outputDirHost?: string;
+}
+
+function buildDockerArgs(language: string, hostCodePath: string, opts: BuildOptions = {}): string[] {
     if (!validateLanguage(language)) {
         throw new Error('Invalid language');
     }
@@ -848,31 +1124,34 @@ function buildDockerArgs(language, hostCodePath, opts = {}) {
         throw new Error('Invalid container path format');
     }
 
-    const args = ['run', '--rm'];
+    // Pre-allocate array with estimated size to reduce reallocations
+    const args: string[] = [];
+    args.length = 0; // Reset but keep capacity
+    
+    // Build args more efficiently
+    args.push('run', '--rm');
     args.push(`--memory=${CONFIG.MAX_MEMORY}`);
-    args.push(
-        `--cpus=${language === 'kotlin' ? CONFIG.MAX_CPU_PERCENT_KOTLIN : CONFIG.MAX_CPU_PERCENT}`
-    );
+    args.push(`--cpus=${language === 'kotlin' ? CONFIG.MAX_CPU_PERCENT_KOTLIN : CONFIG.MAX_CPU_PERCENT}`);
+    
     if (language !== 'typescript' && language !== 'bash') {
         args.push('--network=none');
     }
-    args.push('--read-only');
-    args.push('--tmpfs');
-    args.push(`/tmp:rw,exec,nosuid,size=${tmpfsSize},noatime`);
-
-    args.push('--cap-drop=ALL');
-    args.push('--security-opt');
-    args.push('no-new-privileges');
-    args.push('--pids-limit=128');
-    args.push('--ulimit');
-    args.push('nofile=1024:1024');
-    args.push('--user');
-    args.push('1000:1000');
+    
+    args.push('--read-only', '--tmpfs', `/tmp:rw,exec,nosuid,size=${tmpfsSize},noatime`);
+    args.push('--cap-drop=ALL', '--security-opt', 'no-new-privileges');
+    args.push('--pids-limit=128', '--ulimit', 'nofile=1024:1024');
+    args.push('--user', '1000:1000');
 
     const hostCodeDir = path.dirname(hostCodePath);
     const hostFileName = path.basename(hostCodePath);
     const dockerHostDir = convertToDockerPath(hostCodeDir);
     const mountedFilePath = `/code/${hostFileName}`;
+
+    // Validate dockerHostDir
+    if (!dockerHostDir || dockerHostDir.trim() === '' || !dockerHostDir.startsWith('/')) {
+        console.error(`[ERROR] Invalid dockerHostDir: "${dockerHostDir}" from hostCodeDir: "${hostCodeDir}"`);
+        throw new Error(`Invalid Docker host directory path: ${dockerHostDir}`);
+    }
 
     if (CONFIG.DEBUG_MODE) {
         console.log(
@@ -880,51 +1159,76 @@ function buildDockerArgs(language, hostCodePath, opts = {}) {
         );
     }
 
-    args.push('-v');
-    args.push(`${dockerHostDir}:/code:ro`);
+    // Collect all volume mounts first
+    const volumeMounts: string[] = [];
+    
+    // Add code directory volume
+    volumeMounts.push('-v', `${dockerHostDir}:/code:ro`);
 
     if (opts.inputPath) {
         const hostInputDir = path.dirname(opts.inputPath);
         const dockerInputDir = convertToDockerPath(hostInputDir);
+        const inputBasename = path.basename(opts.inputPath);
+        
+        // Validate dockerInputDir
+        if (!dockerInputDir || dockerInputDir.trim() === '' || !dockerInputDir.startsWith('/')) {
+            console.error(`[ERROR] Invalid dockerInputDir: "${dockerInputDir}" from hostInputDir: "${hostInputDir}"`);
+            throw new Error(`Invalid Docker input directory path: ${dockerInputDir}`);
+        }
+        
         if (CONFIG.DEBUG_MODE) {
             console.log(
                 `[DEBUG] Input file paths: hostInputPath=${opts.inputPath}, dockerInputDir=${dockerInputDir}`
             );
         }
-        args.push('-v');
-        args.push(`${dockerInputDir}:/input:ro`);
+        volumeMounts.push('-v', `${dockerInputDir}:/input:ro`);
     }
-
-    const inputFileCheck = opts.inputPath
-        ? !CONFIG.DEBUG_MODE
-            ? `test -f "/input/${path.basename(opts.inputPath)}" || (echo "ERROR: Input file not found" >&2 && exit 1) && `
-            : `echo "[DEBUG] Checking input file: /input/${path.basename(opts.inputPath)}" >&2 && if [ ! -f "/input/${path.basename(opts.inputPath)}" ]; then echo "ERROR: Input file not found: /input/${path.basename(opts.inputPath)}" >&2; ls -la /input >&2; exit 1; fi && `
-        : '';
-    const fileCopy = !CONFIG.DEBUG_MODE
-        ? `test -f "${mountedFilePath}" || (echo "ERROR: Source file not found" >&2 && exit 1) && cp "${mountedFilePath}" "${containerPath}" && test -f "${containerPath}" || (echo "ERROR: Copy failed" >&2 && exit 1) && `
-        : `echo "[DEBUG] Checking source file: ${mountedFilePath}" >&2 && if [ ! -f "${mountedFilePath}" ]; then echo "ERROR: Source file not found: ${mountedFilePath}" >&2; ls -la /code >&2; exit 1; fi && echo "[DEBUG] Copying file to ${containerPath}" >&2 && cp "${mountedFilePath}" "${containerPath}" && echo "[DEBUG] Verifying copied file" >&2 && if [ ! -f "${containerPath}" ]; then echo "ERROR: Destination file not found after copy: ${containerPath}" >&2; ls -la /tmp >&2; exit 1; fi && if [ ! -s "${containerPath}" ]; then echo "ERROR: Destination file is empty: ${containerPath}" >&2; exit 1; fi && echo "[DEBUG] File copy successful" >&2 && `;
-    const finalCommand = `${inputFileCheck}${fileCopy}${command}`;
-
+    
     if (language === 'kotlin') {
         const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
-        args.push('-v');
-        args.push(`${hostKotlinCache}:/opt/kotlin`);
+        if (!hostKotlinCache || hostKotlinCache.trim() === '' || !hostKotlinCache.startsWith('/')) {
+            console.error(`[ERROR] Invalid hostKotlinCache: "${hostKotlinCache}" from kotlinCacheDir: "${kotlinCacheDir}"`);
+            throw new Error(`Invalid Docker Kotlin cache directory path: ${hostKotlinCache}`);
+        }
+        volumeMounts.push('-v', `${hostKotlinCache}:/opt/kotlin`);
     }
     if (opts.outputDirHost) {
         const hostOutputDir = convertToDockerPath(opts.outputDirHost);
-        args.push('-v');
-        args.push(`${hostOutputDir}:/output:rw`);
+        if (!hostOutputDir || hostOutputDir.trim() === '' || !hostOutputDir.startsWith('/')) {
+            console.error(`[ERROR] Invalid hostOutputDir: "${hostOutputDir}" from outputDirHost: "${opts.outputDirHost}"`);
+            throw new Error(`Invalid Docker output directory path: ${hostOutputDir}`);
+        }
+        volumeMounts.push('-v', `${hostOutputDir}:/output:rw`);
     }
+    
+    // Add all volume mounts before the image name
+    args.push(...volumeMounts);
 
-    args.push(config.image);
-    args.push('sh');
-    args.push('-c');
-    args.push(finalCommand);
+    if (opts.inputPath) {
+        const inputBasename = path.basename(opts.inputPath);
+        
+        // Build command parts more efficiently
+        const inputFileCheck = !CONFIG.DEBUG_MODE
+            ? `test -f "/input/${inputBasename}" || (echo "ERROR: Input file not found" >&2 && exit 1) && `
+            : `echo "[DEBUG] Checking input file: /input/${inputBasename}" >&2 && if [ ! -f "/input/${inputBasename}" ]; then echo "ERROR: Input file not found: /input/${inputBasename}" >&2; ls -la /input >&2; exit 1; fi && `;
+        
+        const fileCopy = !CONFIG.DEBUG_MODE
+            ? `test -f "${mountedFilePath}" || (echo "ERROR: Source file not found" >&2 && exit 1) && cp "${mountedFilePath}" "${containerPath}" && test -f "${containerPath}" || (echo "ERROR: Copy failed" >&2 && exit 1) && `
+            : `echo "[DEBUG] Checking source file: ${mountedFilePath}" >&2 && if [ ! -f "${mountedFilePath}" ]; then echo "ERROR: Source file not found: ${mountedFilePath}" >&2; ls -la /code >&2; exit 1; fi && echo "[DEBUG] Copying file to ${containerPath}" >&2 && cp "${mountedFilePath}" "${containerPath}" && echo "[DEBUG] Verifying copied file" >&2 && if [ ! -f "${containerPath}" ]; then echo "ERROR: Destination file not found after copy: ${containerPath}" >&2; ls -la /tmp >&2; exit 1; fi && if [ ! -s "${containerPath}" ]; then echo "ERROR: Destination file is empty: ${containerPath}" >&2; exit 1; fi && echo "[DEBUG] File copy successful" >&2 && `;
+        
+        args.push(config.image, 'sh', '-c', `${inputFileCheck}${fileCopy}${command}`);
+    } else {
+        const fileCopy = !CONFIG.DEBUG_MODE
+            ? `test -f "${mountedFilePath}" || (echo "ERROR: Source file not found" >&2 && exit 1) && cp "${mountedFilePath}" "${containerPath}" && test -f "${containerPath}" || (echo "ERROR: Copy failed" >&2 && exit 1) && `
+            : `echo "[DEBUG] Checking source file: ${mountedFilePath}" >&2 && if [ ! -f "${mountedFilePath}" ]; then echo "ERROR: Source file not found: ${mountedFilePath}" >&2; ls -la /code >&2; exit 1; fi && echo "[DEBUG] Copying file to ${containerPath}" >&2 && cp "${mountedFilePath}" "${containerPath}" && echo "[DEBUG] Verifying copied file" >&2 && if [ ! -f "${containerPath}" ]; then echo "ERROR: Destination file not found after copy: ${containerPath}" >&2; ls -la /tmp >&2; exit 1; fi && if [ ! -s "${containerPath}" ]; then echo "ERROR: Destination file is empty: ${containerPath}" >&2; exit 1; fi && echo "[DEBUG] File copy successful" >&2 && `;
+        
+        args.push(config.image, 'sh', '-c', `${fileCopy}${command}`);
+    }
 
     return args;
 }
 
-function validateJavaClass(code) {
+function validateJavaClass(code: string): void {
     if (typeof code !== 'string') {
         throw new Error('Invalid code format');
     }
@@ -941,7 +1245,7 @@ function validateJavaClass(code) {
     }
 }
 
-async function writeCodeFile(codePath, code, language) {
+async function writeCodeFile(codePath: string, code: string, language: string): Promise<string> {
     if (!validateLanguage(language)) {
         throw new Error('Invalid language');
     }
@@ -952,7 +1256,7 @@ async function writeCodeFile(codePath, code, language) {
 
     const resolvedCodePath = path.resolve(codePath);
     let finalCode = code;
-    let fileExtension;
+    let fileExtension: string;
 
     switch (language) {
         case 'java':
@@ -986,9 +1290,14 @@ async function writeCodeFile(codePath, code, language) {
     return fullPath;
 }
 
-async function findImageFiles(outputDir) {
+interface ImageFile {
+    name: string;
+    data: string;
+}
+
+async function findImageFiles(outputDir: string): Promise<ImageFile[]> {
     const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.bmp', '.webp'];
-    const images = [];
+    const images: ImageFile[] = [];
 
     try {
         const files = await fs.readdir(outputDir);
@@ -1018,7 +1327,15 @@ async function findImageFiles(outputDir) {
 }
 
 class OutputCollector {
-    constructor(maxBytes) {
+    private maxBytes: number;
+    private stdout: string;
+    private stderr: string;
+    private stdoutBytes: number;
+    private stderrBytes: number;
+    private stdoutTruncated: boolean;
+    private stderrTruncated: boolean;
+
+    constructor(maxBytes: number) {
         this.maxBytes = maxBytes;
         this.stdout = '';
         this.stderr = '';
@@ -1028,7 +1345,7 @@ class OutputCollector {
         this.stderrTruncated = false;
     }
 
-    addStdout(data) {
+    addStdout(data: Buffer | string): void {
         if (this.stdoutTruncated) {
             return;
         }
@@ -1050,7 +1367,7 @@ class OutputCollector {
         }
     }
 
-    addStderr(data) {
+    addStderr(data: Buffer | string): void {
         if (this.stderrTruncated) {
             return;
         }
@@ -1072,7 +1389,7 @@ class OutputCollector {
         }
     }
 
-    getFinalOutput() {
+    getFinalOutput(): { stdout: string; stderr: string } {
         let stdout = this.stdout;
         let stderr = this.stderr;
         if (this.stdoutTruncated) {
@@ -1086,50 +1403,48 @@ class OutputCollector {
 }
 
 async function executeDockerProcess(
-    language,
-    fullCodePath,
-    buildOptions,
-    config,
-    startTime,
-    res,
-    sessionOutputDir,
-    fullInputPath,
-    getResponseSent,
-    setResponseSent
-) {
+    language: string,
+    fullCodePath: string,
+    buildOptions: BuildOptions,
+    config: LanguageConfig,
+    startTime: number,
+    res: Response,
+    sessionOutputDir: string,
+    fullInputPath: string | null,
+    getResponseSent: () => boolean,
+    setResponseSent: (value: boolean) => void
+): Promise<void> {
     const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions);
+    
+    // Debug: log Docker command
+    if (CONFIG.DEBUG_MODE) {
+        console.log('[DEBUG] Docker command:', 'docker', dockerArgs.join(' '));
+    }
+    
     const controller = new AbortController();
     const abortTimeoutId = setTimeout(
         () => controller.abort(),
         config.timeout + CONFIG.TIMEOUT_BUFFER_MS
     );
     const dockerProcess = spawn('docker', dockerArgs, {
-        signal: controller.signal,
-        maxBuffer: CONFIG.MAX_BUFFER_SIZE
+        signal: controller.signal
     });
 
     dockerProcess.stdout.setEncoding('utf8');
     dockerProcess.stderr.setEncoding('utf8');
 
-    if (dockerProcess.stdout.setDefaultEncoding) {
-        dockerProcess.stdout.setDefaultEncoding('utf8');
-    }
-    if (dockerProcess.stderr.setDefaultEncoding) {
-        dockerProcess.stderr.setDefaultEncoding('utf8');
-    }
-
     const outputCollector = new OutputCollector(CONFIG.MAX_OUTPUT_BYTES);
 
-    dockerProcess.stdout.on('data', (data) => {
+    dockerProcess.stdout.on('data', (data: Buffer | string) => {
         outputCollector.addStdout(data);
     });
 
-    dockerProcess.stderr.on('data', (data) => {
+    dockerProcess.stderr.on('data', (data: Buffer | string) => {
         outputCollector.addStderr(data);
     });
 
     let responseHandled = false;
-    const markResponseHandled = () => {
+    const markResponseHandled = (): boolean => {
         if (responseHandled) {
             return false;
         }
@@ -1137,7 +1452,7 @@ async function executeDockerProcess(
         return true;
     };
 
-    const handleClose = async (code) => {
+    const handleClose = async (code: number | null): Promise<void> => {
         if (!markResponseHandled()) {
             return;
         }
@@ -1146,8 +1461,34 @@ async function executeDockerProcess(
             const executionTime = Date.now() - startTime;
             await cleanupResources(fullCodePath, fullInputPath);
 
-            const error = code !== 0 ? { code, killed: false, signal: null } : null;
             const { stdout, stderr } = outputCollector.getFinalOutput();
+            
+            // Check for Docker command errors in stderr
+            let error: ExecutionError | null = null;
+            if (code !== 0) {
+                error = { code, killed: false, signal: null };
+                
+                // Always pass stderr through for Docker errors - let sanitizeErrorForUser extract the actual error
+                const stderrLower = (stderr || '').toLowerCase();
+                if (stderrLower.includes("run 'docker") || 
+                    stderrLower.includes("docker:") ||
+                    stderrLower.includes("cannot connect to the docker daemon") ||
+                    stderrLower.includes("docker daemon") ||
+                    stderrLower.includes("'docker' is not recognized") ||
+                    stderrLower.includes("docker: command not found") ||
+                    stderrLower.includes("spawn docker enoent") ||
+                    stderrLower.includes("error response from daemon") ||
+                    stderrLower.includes("invalid reference format") ||
+                    stderrLower.includes("no such image") ||
+                    stderrLower.includes("permission denied")) {
+                    // Pass the full stderr so sanitizeErrorForUser can extract the actual error message
+                    error.message = stderr || 'Docker error';
+                } else if (stderr && stderr.trim()) {
+                    // For non-zero exit codes, include stderr in error message
+                    error.message = stderr;
+                }
+            }
+            
             await handleExecutionResult(
                 error,
                 stdout,
@@ -1172,7 +1513,7 @@ async function executeDockerProcess(
         }
     };
 
-    const handleError = async (error) => {
+    const handleError = async (error: Error): Promise<void> => {
         if (!markResponseHandled()) {
             return;
         }
@@ -1182,10 +1523,39 @@ async function executeDockerProcess(
             await cleanupResources(fullCodePath, fullInputPath);
 
             const { stdout, stderr } = outputCollector.getFinalOutput();
+            
+            // Check if it's a Docker-related error
+            const errorMessage = error.message || '';
+            const combinedStderr = stderr || errorMessage;
+            
+            // Create error object with stderr content for Docker errors
+            let executionError: ExecutionError | Error = error;
+            
+            // Detect Docker daemon errors - pass stderr through for better error extraction
+            if (errorMessage.includes('ENOENT') || 
+                errorMessage.includes('docker') || 
+                combinedStderr.toLowerCase().includes('docker') ||
+                combinedStderr.toLowerCase().includes("run 'docker")) {
+                executionError = { 
+                    message: combinedStderr || errorMessage,
+                    code: null,
+                    killed: false,
+                    signal: null
+                } as ExecutionError;
+            } else if (combinedStderr) {
+                // For other errors, include stderr in the message
+                executionError = { 
+                    message: combinedStderr,
+                    code: null,
+                    killed: false,
+                    signal: null
+                } as ExecutionError;
+            }
+            
             await handleExecutionResult(
-                error,
+                executionError,
                 stdout,
-                stderr,
+                combinedStderr,
                 executionTime,
                 res,
                 sessionOutputDir
@@ -1242,7 +1612,7 @@ async function executeDockerProcess(
         }
     }, config.timeout + CONFIG.TIMEOUT_BUFFER_MS);
 
-    const cleanupTimeout = () => {
+    const cleanupTimeout = (): void => {
         clearTimeout(abortTimeoutId);
         clearTimeout(processTimeoutId);
     };
@@ -1250,7 +1620,7 @@ async function executeDockerProcess(
     dockerProcess.once('error', cleanupTimeout);
 }
 
-async function cleanupResources(fullCodePath, fullInputPath) {
+async function cleanupResources(fullCodePath: string | null, fullInputPath: string | null): Promise<void> {
     const cleanupPromises = [cleanupFile(fullCodePath)];
     if (fullInputPath) {
         cleanupPromises.push(cleanupFile(fullInputPath));
@@ -1258,12 +1628,26 @@ async function cleanupResources(fullCodePath, fullInputPath) {
     await Promise.allSettled(cleanupPromises);
 }
 
-async function handleExecutionResult(error, stdout, stderr, executionTime, res, outputDir = null) {
+interface ExecutionError {
+    code?: number | null;
+    killed?: boolean;
+    signal?: string | null;
+    message?: string;
+}
+
+async function handleExecutionResult(
+    error: ExecutionError | Error | null,
+    stdout: string,
+    stderr: string,
+    executionTime: number,
+    res: Response,
+    outputDir: string | null = null
+): Promise<void> {
     const filteredStdout = filterDockerMessages(stdout || '');
     const filteredStderr = filterDockerMessages(stderr || '');
     const hasStdout = stdout && stdout.trim().length > 0;
 
-    let images = [];
+    let images: ImageFile[] = [];
     if (outputDir) {
         try {
             images = await findImageFiles(outputDir);
@@ -1278,20 +1662,28 @@ async function handleExecutionResult(error, stdout, stderr, executionTime, res, 
     }
 
     if (error) {
-        let errorMsg;
-        if (error.killed || error.signal === 'SIGTERM') {
+        let errorMsg: string;
+        if ('killed' in error && error.killed || 'signal' in error && error.signal === 'SIGTERM') {
             errorMsg = 'Execution timeout exceeded.';
         } else {
-            const sanitized = sanitizeError(stderr || error.message || 'Unknown error');
+            // Prioritize error.message if it exists and contains useful info, otherwise use stderr
+            let errorSource: string;
+            if ('message' in error && error.message && error.message !== 'Docker error') {
+                errorSource = error.message;
+            } else {
+                errorSource = stderr || ('message' in error ? error.message || 'Unknown error' : 'Unknown error');
+            }
+            const sanitized = sanitizeError(errorSource);
             errorMsg = sanitizeErrorForUser(sanitized);
         }
 
-        return res.json({
+        res.json({
             output: filteredStdout || '',
             error: errorMsg,
             executionTime,
             images
         });
+        return;
     }
 
     let finalOutput = hasStdout ? filteredStdout : '';
@@ -1323,11 +1715,17 @@ async function handleExecutionResult(error, stdout, stderr, executionTime, res, 
     });
 }
 
-app.post('/api/execute', executeLimiter, async (req, res) => {
+interface ExecuteRequestBody {
+    code?: unknown;
+    language?: unknown;
+    input?: unknown;
+}
+
+app.post('/api/execute', executeLimiter, async (req: Request<{}, {}, ExecuteRequestBody>, res: Response) => {
     const { code, language, input = '' } = req.body;
     let responseSent = false;
 
-    const sendResponse = (statusCode, data) => {
+    const sendResponse = (statusCode: number, data: object): void => {
         if (!responseSent) {
             responseSent = true;
             res.status(statusCode).json(data);
@@ -1352,7 +1750,7 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
         return sendResponse(400, { error: 'Unsupported language' });
     }
 
-    let inputText;
+    let inputText: string;
     if (typeof input === 'string') {
         inputText = input;
     } else if (input === null || input === undefined) {
@@ -1368,36 +1766,42 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
 
     const sessionId = crypto.randomBytes(16).toString('hex');
     const codePath = path.join(codeDir, `${sessionId}_code`);
-    let fullCodePath = null;
-    let fullInputPath = null;
-
-    try {
-        sanitizeCode(code);
-        fullCodePath = await writeCodeFile(codePath, code, language);
-
-        if (!validatePath(fullCodePath)) {
-            throw new Error('Invalid file path generated');
-        }
+    let fullCodePath: string | null = null;
+    let fullInputPath: string | null = null;
 
         try {
-            const stats = await fs.stat(fullCodePath);
-            if (!stats.isFile()) {
-                throw new Error(`Path exists but is not a file: ${fullCodePath}`);
-            }
-            if (CONFIG.DEBUG_MODE) {
-                console.log(
-                    `[DEBUG] File created successfully: ${fullCodePath}, size: ${stats.size} bytes`
-                );
-            }
-        } catch (error) {
-            console.error(`[ERROR] File verification failed: ${fullCodePath}`, error);
-            throw new Error(`Failed to create or verify code file: ${error.message}`);
-        }
+            sanitizeCode(code);
+            
+            // Parallelize file write and directory creation
+            const sessionOutputDir = path.join(outputDir, sessionId);
+            const [writtenPath] = await Promise.all([
+                writeCodeFile(codePath, code, language),
+                fs.mkdir(sessionOutputDir, { recursive: true })
+            ]);
+            fullCodePath = writtenPath;
 
-        const sessionOutputDir = path.join(outputDir, sessionId);
-        await fs.mkdir(sessionOutputDir, { recursive: true });
+            if (!validatePath(fullCodePath)) {
+                throw new Error('Invalid file path generated');
+            }
 
-        let buildOptions = {};
+            // Verify file exists (non-blocking check)
+            try {
+                const stats = await fs.stat(fullCodePath);
+                if (!stats.isFile()) {
+                    throw new Error(`Path exists but is not a file: ${fullCodePath}`);
+                }
+                if (CONFIG.DEBUG_MODE) {
+                    console.log(
+                        `[DEBUG] File created successfully: ${fullCodePath}, size: ${stats.size} bytes`
+                    );
+                }
+            } catch (error) {
+                console.error(`[ERROR] File verification failed: ${fullCodePath}`, error);
+                const err = error as Error;
+                throw new Error(`Failed to create or verify code file: ${err.message}`);
+            }
+
+        let buildOptions: BuildOptions = {};
         if (language === 'kotlin') {
             if (!kotlinCompilerExistsOnHost()) {
                 warmupKotlinOnStart().catch(() => {});
@@ -1408,7 +1812,7 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
                 });
             }
         }
-        buildOptions.hasInput = inputText && inputText.trim().length > 0;
+        buildOptions.hasInput = !!(inputText && inputText.trim().length > 0);
         buildOptions.outputDirHost = sessionOutputDir;
 
         if (buildOptions.hasInput) {
@@ -1450,11 +1854,11 @@ app.post('/api/execute', executeLimiter, async (req, res) => {
     }
 });
 
-app.get('/api/health', healthLimiter, (_, res) => {
+app.get('/api/health', healthLimiter, (_: Request, res: Response) => {
     res.json({ status: 'ok' });
 });
 
-app.use((err, _, res, _next) => {
+app.use((err: Error, _: Request, res: Response, _next: NextFunction) => {
     console.error('Unhandled error:', err.message || 'Unknown error');
     res.status(500).json({ error: 'Internal server error' });
 });
@@ -1484,3 +1888,4 @@ ensureDirectories()
             warmupContainers();
         }
     });
+

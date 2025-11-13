@@ -14,9 +14,17 @@ RUN apt-get update && apt-get install -y \
 # Copy package files
 COPY package.json ./
 COPY package-lock.json* ./
+COPY tsconfig.json ./
 
-# Install dependencies
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm cache clean --force
+# Install all dependencies (including dev dependencies for TypeScript)
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm cache clean --force
+
+# Copy source files
+COPY server.ts ./
+COPY config.ts ./
+
+# Build TypeScript
+RUN npm run build
 
 # Production stage
 FROM node:25-slim AS production
@@ -40,12 +48,15 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Copy dependencies from builder
-COPY --from=builder /app/node_modules ./node_modules
+# Copy package files
+COPY package.json ./
+COPY package-lock.json* ./
 
-# Copy application files
-COPY server.js ./
-COPY config.js ./
+# Install only production dependencies
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm cache clean --force
+
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
 
 # Create necessary directories
 RUN mkdir -p /app/code /app/output /app/tool_cache \
@@ -62,4 +73,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 # Start the application
-CMD ["node", "server.js"]
+CMD ["node", "dist/server.js"]
