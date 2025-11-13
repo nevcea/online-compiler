@@ -26,6 +26,13 @@ jobs:
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
 
+            - name: Create .env file if not exists
+              run: |
+                  if [ ! -f .env ]; then
+                      touch .env
+                      echo "# Environment variables (optional)" >> .env
+                  fi
+
             - name: Build Docker image
               run: |
                   docker compose build

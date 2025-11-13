@@ -21,6 +21,7 @@ services:
             - DEBUG=${DEBUG:-false}
         env_file:
             - .env
+        # Note: .env file is optional. If it doesn't exist, default values will be used.
         restart: unless-stopped
         healthcheck:
             test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
