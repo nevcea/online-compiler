@@ -69,9 +69,11 @@ export default [
         ignores: [
             'node_modules/**',
             'backend/node_modules/**',
+            'frontend/node_modules/**',
             'backend/code/**',
             'backend/output/**',
             'dist/**',
+            'frontend/dist/**',
             'build/**',
             '*.min.js',
             'coverage/**'

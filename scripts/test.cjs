@@ -20,7 +20,7 @@ function runCommand(command, cwd, description) {
 		execSync(command, { stdio: 'inherit', cwd });
 		console.log(`  ${description} passed\n`);
 		return true;
-	} catch (error) {
+	} catch {
 		console.error(`  ${description} failed\n`);
 		return false;
 	}
@@ -36,45 +36,45 @@ try {
 		});
 	} else {
 		console.log('Running tests and checks...\n');
-		
+
 		let allPassed = true;
 		const startTime = Date.now();
-		
+
 		if (!runCommand('npm run format', rootDir, 'Formatting code')) {
 			allPassed = false;
 		}
-		
+
 		if (!runCommand('npm run format:check', rootDir, 'Checking code formatting')) {
 			allPassed = false;
 		}
-		
+
 		if (!runCommand('npm run lint', rootDir, 'Running root ESLint')) {
 			allPassed = false;
 		}
-		
-		if (!runCommand('npx eslint server.js -c ../eslint.config.js', 
-		                path.join(rootDir, 'backend'), 
+
+		if (!runCommand('npx eslint server.js -c ../eslint.config.js',
+		                path.join(rootDir, 'backend'),
 		                'Running backend ESLint')) {
 			allPassed = false;
 		}
-		
-		if (!runCommand('npm run lint', 
-		                path.join(rootDir, 'frontend'), 
+
+		if (!runCommand('npm run lint',
+		                path.join(rootDir, 'frontend'),
 		                'Running frontend ESLint')) {
 			allPassed = false;
 		}
-		
+
 		const frontendPackageJson = require(path.join(rootDir, 'frontend', 'package.json'));
 		if (frontendPackageJson.devDependencies?.typescript) {
-			if (!runCommand('npx tsc --noEmit', 
-			                path.join(rootDir, 'frontend'), 
+			if (!runCommand('npx tsc --noEmit',
+			                path.join(rootDir, 'frontend'),
 			                'Running TypeScript type check')) {
 				allPassed = false;
 			}
 		}
-		
+
 		const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-		
+
 		console.log('='.repeat(50));
 		if (allPassed) {
 			console.log(`\nAll checks passed! (${duration}s)\n`);

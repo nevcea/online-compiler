@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import CodeEditor from '../components/CodeEditor';
 import OutputPanel from '../components/OutputPanel';
@@ -35,50 +35,7 @@ const CompilerPage = () => {
     const editorLanguageDropdownRef = useRef(null);
     const editorLanguageButtonRef = useRef(null);
 
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            const target = e.target;
-            const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-            
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isRunning && !isInputFocused) {
-                e.preventDefault();
-                handleRun();
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k' && !isInputFocused) {
-                e.preventDefault();
-                handleClear();
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [code, isRunning]);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (
-                editorLanguageDropdownRef.current &&
-                !editorLanguageDropdownRef.current.contains(event.target) &&
-                editorLanguageButtonRef.current &&
-                !editorLanguageButtonRef.current.contains(event.target)
-            ) {
-                setIsEditorLanguageDropdownOpen(false);
-                setLanguageSearchQuery('');
-            }
-        };
-
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, []);
-
-    useEffect(() => {
-        if (!isEditorLanguageDropdownOpen) {
-            setLanguageSearchQuery('');
-        }
-    }, [isEditorLanguageDropdownOpen]);
-
-
-    const handleRun = async () => {
+    const handleRun = useCallback(async () => {
         if (!code || !code.trim()) {
             return;
         }
@@ -108,7 +65,6 @@ const CompilerPage = () => {
             }
             setError(formattedError);
         } catch (err) {
-            const endTime = Date.now();
             setExecutionTime(Date.now() - startTime);
             let userMessage = t('connection-error');
             let errorType = 'error';
@@ -133,11 +89,53 @@ const CompilerPage = () => {
         } finally {
             setIsRunning(false);
         }
-    };
+    }, [code, currentLanguage, input, t, showToast, setError, setExecutionTime, setIsRunning, setOutput]);
 
-    const handleClear = () => {
+    const handleClear = useCallback(() => {
         setPendingClearCode(true);
-    };
+    }, []);
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            const target = e.target;
+            const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+            
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isRunning && !isInputFocused) {
+                e.preventDefault();
+                handleRun();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k' && !isInputFocused) {
+                e.preventDefault();
+                handleClear();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isRunning, handleRun, handleClear]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                editorLanguageDropdownRef.current &&
+                !editorLanguageDropdownRef.current.contains(event.target) &&
+                editorLanguageButtonRef.current &&
+                !editorLanguageButtonRef.current.contains(event.target)
+            ) {
+                setIsEditorLanguageDropdownOpen(false);
+                setLanguageSearchQuery('');
+            }
+        };
+
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (!isEditorLanguageDropdownOpen) {
+            setLanguageSearchQuery('');
+        }
+    }, [isEditorLanguageDropdownOpen]);
 
     const confirmClear = () => {
         const template = LANGUAGE_CONFIG.templates[currentLanguage] || '';

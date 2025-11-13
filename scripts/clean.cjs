@@ -65,7 +65,7 @@ function emptyDirIfExists(targetPath) {
 function removeLogsRecursively(startDir) {
 	const stack = [startDir];
 	let removedCount = 0;
-	
+
 	while (stack.length) {
 		const current = stack.pop();
 		let entries;
@@ -74,17 +74,17 @@ function removeLogsRecursively(startDir) {
 		} catch {
 			continue;
 		}
-		
+
 		for (const entry of entries) {
 			const full = path.join(current, entry.name);
-			
-			if (entry.name === 'node_modules' || 
-			    entry.name === '.git' || 
+
+			if (entry.name === 'node_modules' ||
+			    entry.name === '.git' ||
 			    entry.name === 'dist' ||
 			    entry.name === 'build') {
 				continue;
 			}
-			
+
 			if (entry.isDirectory()) {
 				stack.push(full);
 			} else if (entry.isFile() && entry.name.endsWith('.log')) {
@@ -96,7 +96,7 @@ function removeLogsRecursively(startDir) {
 			}
 		}
 	}
-	
+
 	return removedCount;
 }
 
@@ -104,10 +104,10 @@ function getDirSize(dirPath) {
 	if (!fs.existsSync(dirPath)) {
 		return 0;
 	}
-	
+
 	let size = 0;
 	const stack = [dirPath];
-	
+
 	while (stack.length) {
 		const current = stack.pop();
 		try {
@@ -127,12 +127,12 @@ function getDirSize(dirPath) {
 		} catch {
 		}
 	}
-	
+
 	return size;
 }
 
 function formatBytes(bytes) {
-	if (bytes === 0) return '0 B';
+	if (bytes === 0) {return '0 B';}
 	const k = 1024;
 	const sizes = ['B', 'KB', 'MB', 'GB'];
 	const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -148,7 +148,7 @@ try {
 		});
 	} else {
 		const force = args.includes('--force') || args.includes('-f');
-		
+
 		if (!force) {
 			console.log('This will remove:');
 			console.log('   - node_modules directories');
@@ -158,11 +158,11 @@ try {
 			console.log('   - Docker containers and volumes\n');
 			console.log('Use --force or -f to skip this confirmation.\n');
 		}
-		
+
 		console.log('Cleaning up...\n');
-		
+
 		let totalFreed = 0;
-		
+
 		const composeCmd = resolveDockerComposeCommand();
 		if (composeCmd) {
 			console.log('Stopping Docker containers...');
@@ -173,14 +173,14 @@ try {
 				console.log('  Could not stop Docker containers (may not be running)\n');
 			}
 		}
-		
+
 		console.log('Removing node_modules...');
 		const nodeModulesDirs = [
 			path.join(rootDir, 'node_modules'),
 			path.join(rootDir, 'backend', 'node_modules'),
 			path.join(rootDir, 'frontend', 'node_modules')
 		];
-		
+
 		for (const dir of nodeModulesDirs) {
 			if (fs.existsSync(dir)) {
 				const size = getDirSize(dir);
@@ -191,7 +191,7 @@ try {
 			}
 		}
 		console.log('');
-		
+
 		console.log('Removing build outputs...');
 		const buildDirs = [
 			path.join(rootDir, 'dist'),
@@ -199,7 +199,7 @@ try {
 			path.join(rootDir, 'frontend', 'dist'),
 			path.join(rootDir, 'frontend', 'build')
 		];
-		
+
 		for (const dir of buildDirs) {
 			if (fs.existsSync(dir)) {
 				const size = getDirSize(dir);
@@ -210,16 +210,16 @@ try {
 			}
 		}
 		console.log('');
-		
+
 		console.log('Removing log files...');
 		const logCount = removeLogsRecursively(rootDir);
 		console.log(`  Removed ${logCount} log file(s)\n`);
-		
+
 		console.log('Removing temporary files...');
 		emptyDirIfExists(path.join(rootDir, 'backend', 'code'));
 		emptyDirIfExists(path.join(rootDir, 'backend', 'output'));
 		console.log('  Temporary files removed\n');
-		
+
 		console.log('Removing cache directories...');
 		const cacheDirs = [
 			path.join(rootDir, '.cache'),
@@ -227,7 +227,7 @@ try {
 			path.join(rootDir, 'frontend', '.vite'),
 			path.join(rootDir, 'backend', 'tool_cache')
 		];
-		
+
 		for (const dir of cacheDirs) {
 			if (fs.existsSync(dir)) {
 				const size = getDirSize(dir);
@@ -238,7 +238,7 @@ try {
 			}
 		}
 		console.log('');
-		
+
 		console.log('Cleanup complete!');
 		if (totalFreed > 0) {
 			console.log(`Total space freed: ${formatBytes(totalFreed)}`);

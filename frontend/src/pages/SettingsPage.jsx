@@ -390,7 +390,7 @@ const SettingsPage = () => {
                                                 setFontSize(newValue);
                                             }
                                         }}
-                                        onBlur={(e) => {
+                                        onBlur={() => {
                                             const value = parseInt(fontSizeInput, 10);
                                             if (isNaN(value) || value < 8) {
                                                 setFontSize(8);

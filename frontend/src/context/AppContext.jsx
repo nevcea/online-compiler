@@ -38,6 +38,10 @@ export const AppProvider = ({ children }) => {
     const [toast, setToast] = useState(null);
     const [executionTime, setExecutionTime] = useState(null);
 
+    const getSystemTheme = () => {
+        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
     useEffect(() => {
         localStorage.setItem('language', currentLang);
         document.documentElement.setAttribute('lang', currentLang);
@@ -63,10 +67,6 @@ export const AppProvider = ({ children }) => {
             localStorage.setItem(`code_${currentLanguage}`, code);
         }
     }, [code, currentLanguage]);
-
-    const getSystemTheme = () => {
-        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    };
 
     const changeLanguage = useCallback((lang) => {
         if (lang && ['ko', 'en'].includes(lang)) {
