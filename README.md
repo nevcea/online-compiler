@@ -2,15 +2,6 @@
 
 A secure, multi-language online code compiler and executor built with React and Node.js, using Docker for safe code execution.
 
-## Features
-
-- 17 programming languages
-- Docker-based secure execution
-- Modern React UI with dark/light theme
-- Real-time execution with input/output
-- Image generation support
-- Korean and English support
-
 ## Tech Stack
 
 - **Backend**: Node.js, TypeScript, Express.js
