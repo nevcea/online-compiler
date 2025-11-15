@@ -89,6 +89,11 @@ if (-not (Test-Command "npm" "npm")) { exit 1 }
 if (-not (Test-Command "docker" "Docker")) { exit 1 }
 
 $envFile = Join-Path $PSScriptRoot "..\.env"
+# Create .env file if it doesn't exist (required by docker-compose.yml)
+if (-not (Test-Path $envFile)) {
+    Write-Host "Creating .env file (optional - you can customize it later)" -ForegroundColor Yellow
+    New-Item -Path $envFile -ItemType File -Force | Out-Null
+}
 $envVars = Load-EnvFile $envFile
 if ($envVars.Count -gt 0) {
     Write-Host "Loaded environment variables from .env" -ForegroundColor Green
