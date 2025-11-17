@@ -8,13 +8,13 @@ paths:
     - backend/tool_cache/**
     - frontend/node_modules/**
     - backend/node_modules/**
-    - **/build/**
-    - **/out/**
-    - **/.venv/**
-    - **/.gradle/**
-    - **/target/**
-    - **/bin/**
-    - **/obj/**
+    - "**/build/**"
+    - "**/out/**"
+    - "**/.venv/**"
+    - "**/.gradle/**"
+    - "**/target/**"
+    - "**/bin/**"
+    - "**/obj/**"
     - frontend/dist/**
     - backend/.cache/**
 
