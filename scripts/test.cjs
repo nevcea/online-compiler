@@ -39,8 +39,8 @@ function runCommand(command, cwd, description) {
 try {
 	if (isWindows) {
 		const scriptPath = path.join(__dirname, 'test.ps1');
-		const forwarded = args.map(quoteArg).join(' ');
-		execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" ${forwarded}`, {
+		const { execFileSync } = require('child_process');
+		execFileSync('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args], {
 			stdio: 'inherit',
 			cwd: rootDir
 		});

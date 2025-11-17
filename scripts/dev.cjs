@@ -89,8 +89,8 @@ function loadEnvFile(envPath) {
 
 try {
 	if (isWindows) {
-		const forwarded = args.map(quoteArg).join(' ');
-		execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" ${forwarded}`, {
+		const { execFileSync } = require('child_process');
+		execFileSync('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args], {
 			stdio: 'inherit',
 			cwd: rootDir
 		});
@@ -166,7 +166,7 @@ try {
 		const frontendProcess = spawn('npm', ['run', 'dev'], {
 			cwd: path.join(rootDir, 'frontend'),
 			stdio: 'inherit',
-			shell: true,
+			shell: false,
 			env: { ...process.env }
 		});
 

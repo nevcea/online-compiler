@@ -66,8 +66,8 @@ function loadEnvFile(envPath) {
 
 try {
 	if (isWindows) {
-		const forwarded = args.map(quoteArg).join(' ');
-		execSync(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" ${forwarded}`, {
+		const { execFileSync } = require('child_process');
+		execFileSync('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args], {
 			stdio: 'inherit',
 			cwd: rootDir
 		});
@@ -93,7 +93,8 @@ try {
 		if (!skipTests) {
 			console.log('\nRunning tests...');
 			try {
-				execSync('npm run test', { stdio: 'inherit', cwd: rootDir });
+				const { execFileSync } = require('child_process');
+				execFileSync('npm', ['run', 'test'], { stdio: 'inherit', cwd: rootDir });
 				console.log('  All tests passed\n');
 			} catch {
 				console.error('  Tests failed. Use --skip-tests to skip.');
@@ -104,13 +105,15 @@ try {
 		}
 
 		console.log('Installing dependencies...');
-		execSync('npm install --production=false', { stdio: 'inherit', cwd: rootDir });
-		execSync('npm install --production=false', { stdio: 'inherit', cwd: path.join(rootDir, 'backend') });
-		execSync('npm install --production=false', { stdio: 'inherit', cwd: path.join(rootDir, 'frontend') });
+		const { execFileSync } = require('child_process');
+		execFileSync('npm', ['install', '--production=false'], { stdio: 'inherit', cwd: rootDir });
+		execFileSync('npm', ['install', '--production=false'], { stdio: 'inherit', cwd: path.join(rootDir, 'backend') });
+		execFileSync('npm', ['install', '--production=false'], { stdio: 'inherit', cwd: path.join(rootDir, 'frontend') });
 
 		console.log('\nBuilding frontend...');
 		process.env.NODE_ENV = env;
-		execSync('npm run build', { stdio: 'inherit', cwd: path.join(rootDir, 'frontend') });
+		const { execFileSync: _execFileSync } = require('child_process');
+		_execFileSync('npm', ['run', 'build'], { stdio: 'inherit', cwd: path.join(rootDir, 'frontend') });
 		console.log('  Frontend build complete\n');
 
 		if (!skipDocker) {
