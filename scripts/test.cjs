@@ -7,8 +7,8 @@ const isWindows = process.platform === 'win32';
 const rootDir = path.join(__dirname, '..');
 const args = process.argv.slice(2);
 
-function quoteArg(arg) {
-	if (/[\s"]/g.test(arg)) {
+function _quoteArg(arg) {
+	if (/[\s\"]/g.test(arg)) {
 		return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 	}
 	return arg;

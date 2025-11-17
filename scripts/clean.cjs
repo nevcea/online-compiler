@@ -9,7 +9,7 @@ const rootDir = path.join(__dirname, '..');
 const scriptPath = path.join(__dirname, 'clean.ps1');
 const args = process.argv.slice(2);
 
-function quoteArg(arg) {
+function _quoteArg(arg) {
 	if (/[\s"]/g.test(arg)) {
 		return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 	}
