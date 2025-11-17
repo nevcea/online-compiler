@@ -167,7 +167,12 @@ try {
 		if (composeCmd) {
 			console.log('Stopping Docker containers...');
 			try {
-				execSync(`${composeCmd} down -v`, { stdio: 'inherit', cwd: rootDir });
+				const { execFileSync } = require('child_process');
+				if (composeCmd === 'docker compose') {
+					execFileSync('docker', ['compose', 'down', '-v'], { stdio: 'inherit', cwd: rootDir });
+				} else {
+					execFileSync('docker-compose', ['down', '-v'], { stdio: 'inherit', cwd: rootDir });
+				}
 				console.log('  Docker containers stopped\n');
 			} catch {
 				console.log('  Could not stop Docker containers (may not be running)\n');

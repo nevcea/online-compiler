@@ -14,13 +14,23 @@ function quoteArg(arg) {
 	return arg;
 }
 
+function splitCommand(cmd) {
+	// split respecting quoted strings
+	const parts = cmd.match(/(?:[^\s\"]+|"[^"]*")+/g) || [];
+	return parts.map((p) => p.replace(/^"|"$/g, ''));
+}
+
 function runCommand(command, cwd, description) {
 	try {
 		console.log(`\n${description}...`);
-		execSync(command, { stdio: 'inherit', cwd });
+		const parts = Array.isArray(command) ? command : splitCommand(command);
+		const cmd = parts[0];
+		const args = parts.slice(1);
+		const { execFileSync } = require('child_process');
+		execFileSync(cmd, args, { stdio: 'inherit', cwd });
 		console.log(`  ${description} passed\n`);
 		return true;
-	} catch {
+	} catch (e) {
 		console.error(`  ${description} failed\n`);
 		return false;
 	}

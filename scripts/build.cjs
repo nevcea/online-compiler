@@ -33,7 +33,8 @@ function resolveDockerComposeCommand() {
 
 function checkCommand(command, name) {
 	try {
-		execSync(`${command} --version`, { stdio: 'ignore' });
+		const { execFileSync } = require('child_process');
+		execFileSync(command, ['--version'], { stdio: 'ignore' });
 		return true;
 	} catch {
 		console.error(`[ERROR] ${name} is not installed. Please install ${name} first.`);
@@ -115,7 +116,13 @@ try {
 		if (!skipDocker) {
 			console.log('Building Docker images...');
 			const composeCmd = resolveDockerComposeCommand();
-			execSync(`${composeCmd} build`, { stdio: 'inherit', cwd: rootDir });
+			if (composeCmd === 'docker compose') {
+				const { execFileSync } = require('child_process');
+				execFileSync('docker', ['compose', 'build'], { stdio: 'inherit', cwd: rootDir });
+			} else {
+				const { execFileSync } = require('child_process');
+				execFileSync('docker-compose', ['build'], { stdio: 'inherit', cwd: rootDir });
+			}
 			console.log('  Docker images built\n');
 		} else {
 			console.log('\nSkipping Docker build (--skip-docker flag)\n');

@@ -130,10 +130,19 @@ try {
 
 		const composeCmd = resolveDockerComposeCommand();
 		console.log('\nBuilding Docker images...');
-		execSync(`${composeCmd} build`, { stdio: 'inherit', cwd: rootDir });
+		const { execFileSync } = require('child_process');
+		if (composeCmd === 'docker compose') {
+			execFileSync('docker', ['compose', 'build'], { stdio: 'inherit', cwd: rootDir });
+		} else {
+			execFileSync('docker-compose', ['build'], { stdio: 'inherit', cwd: rootDir });
+		}
 
 		console.log('\nStarting services...');
-		execSync(`${composeCmd} up -d`, { stdio: 'inherit', cwd: rootDir });
+		if (composeCmd === 'docker compose') {
+			execFileSync('docker', ['compose', 'up', '-d'], { stdio: 'inherit', cwd: rootDir });
+		} else {
+			execFileSync('docker-compose', ['up', '-d'], { stdio: 'inherit', cwd: rootDir });
+		}
 
 		console.log('\nWaiting for backend to be ready...');
 		waitForService('http://localhost:3000/health', 30000)

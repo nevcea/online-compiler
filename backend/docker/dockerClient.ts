@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { CONFIG } from '../config';
 import { DockerCommandResult, DockerCommandError } from '../types';
@@ -29,44 +29,48 @@ export async function runDockerCommand(
     if (!validateImage(image) || typeof command !== 'string' || typeof tmpfsSize !== 'string') {
         throw new Error('Invalid parameters');
     }
-    const escapedCommand = command.replace(/'/g, "'\\''").replace(/"/g, '\\"');
-    const networkFlag = allowNetwork ? '' : '--network=none ';
+    const networkFlag = allowNetwork ? [] : ['--network=none'];
     const mounts: string[] = [];
     if (allowNetwork && kotlinCacheDir) {
         try {
             const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
-            mounts.push(`-v ${hostKotlinCache}:/opt/kotlin`);
+            mounts.push('-v', `${hostKotlinCache}:/opt/kotlin`);
         } catch {
         }
     }
-    const dockerCmd = `docker run --rm --memory=${tmpfsSize} --cpus=${CONFIG.MAX_CPU_PERCENT} ${networkFlag}--read-only --tmpfs /tmp:rw,exec,nosuid,size=${tmpfsSize} ${mounts.join(' ')} ${image} sh -c "${escapedCommand}"`;
 
+    const args: string[] = ['run', '--rm', `--memory=${tmpfsSize}`, `--cpus=${CONFIG.MAX_CPU_PERCENT}`, ...networkFlag, '--read-only', '--tmpfs', `/tmp:rw,exec,nosuid,size=${tmpfsSize}`, ...mounts, image, 'sh', '-c', command];
+
+    const dockerCmdStr = ['docker', ...args].join(' ');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     const startTime = Date.now();
 
     try {
-        const { stdout, stderr } = await promisify(exec)(dockerCmd, {
+        const { stdout, stderr } = await promisify(execFile)('docker', args, {
             signal: controller.signal,
             maxBuffer: 1024 * 1024
-        });
+        } as any);
+        const stdoutStr = typeof stdout === 'string' ? stdout : (stdout ? stdout.toString('utf8') : '');
+        const stderrStr = typeof stderr === 'string' ? stderr : (stderr ? stderr.toString('utf8') : '');
         clearTimeout(timeoutId);
         const elapsed = Date.now() - startTime;
-        return { stdout, stderr, elapsed, cmd: dockerCmd };
+        return { stdout: stdoutStr, stderr: stderrStr, elapsed, cmd: dockerCmdStr };
     } catch (error) {
         clearTimeout(timeoutId);
         const elapsed = Date.now() - startTime;
-        const err = error as { message?: string; code?: string | number; signal?: string | null; killed?: boolean; stderr?: string; stdout?: string };
+        const err = error as { message?: string; code?: string | number; signal?: string | null; killed?: boolean; stderr?: Buffer | string; stdout?: Buffer | string };
+        const errorStdout = typeof err.stdout === 'string' ? err.stdout : (err.stdout ? (err.stdout as Buffer).toString('utf8') : '');
+        const errorStderr = typeof err.stderr === 'string' ? err.stderr : (err.stderr ? (err.stderr as Buffer).toString('utf8') : '');
         const errorInfo: DockerCommandError['error'] = {
             message: err.message || 'Unknown error',
             code: err.code,
             signal: err.signal || null,
             killed: err.killed,
-            stderr: err.stderr || '',
-            stdout: err.stdout || ''
+            stderr: errorStderr,
+            stdout: errorStdout
         };
-        // Attach the command string for richer debugging
-        (errorInfo as any).cmd = dockerCmd;
+        (errorInfo as any).cmd = dockerCmdStr;
         throw { error: errorInfo, elapsed } as DockerCommandError;
     }
 }
