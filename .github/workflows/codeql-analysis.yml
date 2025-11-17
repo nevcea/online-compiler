@@ -24,8 +24,6 @@ jobs:
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
-        with:
-          config-file: .github/codeql/codeql-config.yml
 
       - name: Build (autodetect)
         uses: github/codeql-action/autobuild@v3
