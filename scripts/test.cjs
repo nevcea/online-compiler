@@ -9,7 +9,7 @@ const args = process.argv.slice(2);
 
 function quoteArg(arg) {
 	if (/[\s"]/g.test(arg)) {
-		return `"${arg.replace(/"/g, '\\"')}"`;
+		return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 	}
 	return arg;
 }
