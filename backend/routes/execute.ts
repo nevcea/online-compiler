@@ -76,7 +76,7 @@ export function createExecuteRoute(
         }
 
         const sessionId = generateSessionId();
-        const codePath = path.join(codeDir, `${sessionId}_code`);
+        const codePathBase = path.join(codeDir, `${sessionId}_code`);
         let fullCodePath: string | null = null;
         let fullInputPath: string | null = null;
 
@@ -84,7 +84,6 @@ export function createExecuteRoute(
             sanitizeCode(code);
             
             const sessionOutputDir = path.join(outputDir, sessionId);
-            const resolvedCodePath = path.resolve(codePath);
             let finalCode = code;
             let fileExtension: string;
 
@@ -92,11 +91,11 @@ export function createExecuteRoute(
                 case 'java':
                     validateJavaClass(code);
                     finalCode = code.replace(/public\s+class\s+\w+/, 'public class Main');
-                    fileExtension = '.java';
+                    fileExtension = LANGUAGE_EXTENSIONS[language];
                     break;
 
                 case 'csharp':
-                    fileExtension = '.cs';
+                    fileExtension = LANGUAGE_EXTENSIONS[language];
                     break;
 
                 case 'r': {
@@ -115,6 +114,7 @@ export function createExecuteRoute(
                     break;
             }
 
+            const resolvedCodePath = path.resolve(`${codePathBase}${fileExtension}`);
             const [writtenPath] = await Promise.all([
                 writeCodeFile(resolvedCodePath, finalCode, language, CONTAINER_CODE_PATHS, LANGUAGE_EXTENSIONS),
                 fs.mkdir(sessionOutputDir, { recursive: true })

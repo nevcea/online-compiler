@@ -47,7 +47,7 @@ export async function writeCodeFile(
         const classMatch = code.match(/public\s+class\s+(\w+)/);
         if (classMatch) {
             const className = classMatch[1];
-            if (expectedFileName !== `${className}.java`) {
+            if (expectedFileName !== `${className}${extension}`) {
                 console.error('[ERROR] Class name mismatch:', className, expectedFileName);
                 throw new Error(`클래스 이름 ${className}은 파일 이름 ${expectedFileName}과 일치해야 합니다.`);
             }
