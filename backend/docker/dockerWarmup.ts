@@ -206,7 +206,6 @@ export async function warmupContainer(
             }
         }
 
-        // Detailed debug logging (only to server console) for developers
         if (CONFIG.DEBUG_MODE) {
             console.debug(`[WARMUP][DEBUG] Failed warmup for ${config.language}`);
             if ((errorInfo as any).cmd) {
