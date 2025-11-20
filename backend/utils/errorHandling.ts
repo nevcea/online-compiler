@@ -12,6 +12,13 @@ const STACK_TRACE_REGEX = /(.*?)(\n\s+at\s+.*)/s;
 const FILE_PATH_PLACEHOLDER_REGEX = /^\[file path\]$/;
 const DEBUG_PREFIX_REGEX = /^\[DEBUG\]|^DEBUG:/;
 
+function truncateString(str: string, maxLength: number): string {
+    if (str.length > maxLength) {
+        return str.substring(0, maxLength) + '...';
+    }
+    return str;
+}
+
 export function filterDockerMessages(text: unknown): string {
     if (!text || typeof text !== 'string') {
         return '';
@@ -31,10 +38,7 @@ export function filterDockerMessages(text: unknown): string {
     filtered = filteredLines.join('\n');
     filtered = filtered.replace(ANSI_REGEX, '');
     
-    if (filtered.length > 500) {
-        return filtered.substring(0, 500) + '...';
-    }
-    return filtered;
+    return truncateString(filtered, 500);
 }
 
 export function sanitizeError(error: unknown): string {
@@ -49,10 +53,7 @@ export function sanitizeError(error: unknown): string {
         filtered = filtered.replace(pattern, '');
     }
     
-    if (filtered.length > 500) {
-        return filtered.substring(0, 500) + '...';
-    }
-    return filtered;
+    return truncateString(filtered, 500);
 }
 
 export function sanitizeErrorForUser(errorStr: unknown): string {
@@ -60,7 +61,7 @@ export function sanitizeErrorForUser(errorStr: unknown): string {
         return 'An error occurred during execution.';
     }
 
-    console.error('[DEBUG] Original error message:', errorStr.substring(0, 500));
+    console.error('[DEBUG] Original error message:', truncateString(errorStr, 500));
 
     const originalLower = errorStr.toLowerCase();
     
@@ -217,10 +218,7 @@ export function sanitizeErrorForUser(errorStr: unknown): string {
     }
 
     sanitized = filtered.join('\n').trim();
-
-    if (sanitized.length > 300) {
-        sanitized = sanitized.substring(0, 300) + '...';
-    }
+    sanitized = truncateString(sanitized, 300);
 
     if (!sanitized || sanitized.length === 0) {
         return '실행 중 오류가 발생했습니다.';

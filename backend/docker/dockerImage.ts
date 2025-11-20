@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { CONFIG, LANGUAGE_CONFIGS } from '../config';
 import { ImageCacheEntry, PullResult } from '../types';
 import { validateImage } from '../utils/validation';
+import { createTimeoutController } from '../utils/timeout';
 
 const imageExistenceCache = new Map<string, ImageCacheEntry>();
 const IMAGE_CACHE_TTL = 5 * 60 * 1000;
@@ -18,18 +19,17 @@ export async function checkImageExists(image: string): Promise<boolean> {
         return cached.exists;
     }
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const { controller, clear } = createTimeoutController(5000);
     try {
         const { stdout } = await promisify(exec)(`docker images -q ${image}`, {
             signal: controller.signal
         });
-        clearTimeout(timeoutId);
+        clear();
         const exists = stdout.trim().length > 0;
         imageExistenceCache.set(image, { exists, timestamp: now });
         return exists;
     } catch {
-        clearTimeout(timeoutId);
+        clear();
         imageExistenceCache.set(image, { exists: false, timestamp: now });
         return false;
     }
@@ -42,8 +42,7 @@ export async function pullDockerImage(image: string, retries: number = CONFIG.DO
 
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONFIG.DOCKER_PULL_TIMEOUT);
+            const { controller, clear } = createTimeoutController(CONFIG.DOCKER_PULL_TIMEOUT);
 
             const pullProcess = exec(`docker pull ${image}`, { signal: controller.signal });
 
@@ -66,7 +65,7 @@ export async function pullDockerImage(image: string, retries: number = CONFIG.DO
                 pullProcess.on('error', reject);
             });
 
-            clearTimeout(timeoutId);
+            clear();
             return { success: true, image };
         } catch (error) {
             if (attempt < retries) {

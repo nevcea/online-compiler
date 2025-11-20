@@ -42,6 +42,12 @@ export function getContainerCodePath(language: string, extension: string, contai
     return containerCodePaths[language] || `/tmp/code${extension}`;
 }
 
+export function validateDockerPath(dockerPath: string, pathName: string): void {
+    if (!dockerPath || dockerPath.trim() === '' || !dockerPath.startsWith('/')) {
+        throw new Error(`Invalid Docker ${pathName} path: ${dockerPath}`);
+    }
+}
+
 let kotlinCompilerPathCache: { exists: boolean; timestamp: number } | null = null;
 const KOTLIN_CACHE_TTL = 60 * 1000;
 

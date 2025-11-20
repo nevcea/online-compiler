@@ -17,48 +17,51 @@ export class OutputCollector {
         this.stderrTruncated = false;
     }
 
-    addStdout(data: Buffer | string): void {
-        if (this.stdoutTruncated) {
+    private addOutput(data: Buffer | string, isStdout: boolean): void {
+        const truncated = isStdout ? this.stdoutTruncated : this.stderrTruncated;
+        if (truncated) {
             return;
         }
         const s = data.toString('utf8');
         const bytes = Buffer.byteLength(s, 'utf8');
-        const remaining = this.maxBytes - this.stdoutBytes;
+        const currentBytes = isStdout ? this.stdoutBytes : this.stderrBytes;
+        const remaining = this.maxBytes - currentBytes;
         if (remaining <= 0) {
-            this.stdoutTruncated = true;
+            if (isStdout) {
+                this.stdoutTruncated = true;
+            } else {
+                this.stderrTruncated = true;
+            }
             return;
         }
         if (bytes <= remaining) {
-            this.stdout += s;
-            this.stdoutBytes += bytes;
+            if (isStdout) {
+                this.stdout += s;
+                this.stdoutBytes += bytes;
+            } else {
+                this.stderr += s;
+                this.stderrBytes += bytes;
+            }
         } else {
             const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
-            this.stdout += slice;
-            this.stdoutBytes += remaining;
-            this.stdoutTruncated = true;
+            if (isStdout) {
+                this.stdout += slice;
+                this.stdoutBytes += remaining;
+                this.stdoutTruncated = true;
+            } else {
+                this.stderr += slice;
+                this.stderrBytes += remaining;
+                this.stderrTruncated = true;
+            }
         }
     }
 
+    addStdout(data: Buffer | string): void {
+        this.addOutput(data, true);
+    }
+
     addStderr(data: Buffer | string): void {
-        if (this.stderrTruncated) {
-            return;
-        }
-        const s = data.toString('utf8');
-        const bytes = Buffer.byteLength(s, 'utf8');
-        const remaining = this.maxBytes - this.stderrBytes;
-        if (remaining <= 0) {
-            this.stderrTruncated = true;
-            return;
-        }
-        if (bytes <= remaining) {
-            this.stderr += s;
-            this.stderrBytes += bytes;
-        } else {
-            const slice = Buffer.from(s, 'utf8').subarray(0, remaining).toString('utf8');
-            this.stderr += slice;
-            this.stderrBytes += remaining;
-            this.stderrTruncated = true;
-        }
+        this.addOutput(data, false);
     }
 
     getFinalOutput(): { stdout: string; stderr: string } {

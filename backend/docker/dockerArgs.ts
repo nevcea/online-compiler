@@ -9,7 +9,7 @@ import {
 } from '../config';
 import { BuildOptions } from '../types';
 import { validateLanguage, validateImage } from '../utils/validation';
-import { convertToDockerPath, getContainerCodePath } from '../utils/pathUtils';
+import { convertToDockerPath, getContainerCodePath, validateDockerPath } from '../utils/pathUtils';
 import { normalizePath } from '../utils/pathUtils';
 
 export function buildDockerArgs(
@@ -77,9 +77,11 @@ export function buildDockerArgs(
     const dockerHostDir = convertToDockerPath(hostCodeDir);
     const mountedFilePath = `/code/${hostFileName}`;
 
-    if (!dockerHostDir || dockerHostDir.trim() === '' || !dockerHostDir.startsWith('/')) {
+    try {
+        validateDockerPath(dockerHostDir, 'host directory');
+    } catch (error) {
         console.error(`[ERROR] Invalid dockerHostDir: "${dockerHostDir}" from hostCodeDir: "${hostCodeDir}"`);
-        throw new Error(`Invalid Docker host directory path: ${dockerHostDir}`);
+        throw error;
     }
 
     if (CONFIG.DEBUG_MODE) {
@@ -96,9 +98,11 @@ export function buildDockerArgs(
         const hostInputDir = path.dirname(opts.inputPath);
         const dockerInputDir = convertToDockerPath(hostInputDir);
         
-        if (!dockerInputDir || dockerInputDir.trim() === '' || !dockerInputDir.startsWith('/')) {
+        try {
+            validateDockerPath(dockerInputDir, 'input directory');
+        } catch (error) {
             console.error(`[ERROR] Invalid dockerInputDir: "${dockerInputDir}" from hostInputDir: "${hostInputDir}"`);
-            throw new Error(`Invalid Docker input directory path: ${dockerInputDir}`);
+            throw error;
         }
         
         if (CONFIG.DEBUG_MODE) {
@@ -111,17 +115,21 @@ export function buildDockerArgs(
     
     if (language === 'kotlin' && kotlinCacheDir) {
         const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
-        if (!hostKotlinCache || hostKotlinCache.trim() === '' || !hostKotlinCache.startsWith('/')) {
+        try {
+            validateDockerPath(hostKotlinCache, 'Kotlin cache directory');
+        } catch (error) {
             console.error(`[ERROR] Invalid hostKotlinCache: "${hostKotlinCache}" from kotlinCacheDir: "${kotlinCacheDir}"`);
-            throw new Error(`Invalid Docker Kotlin cache directory path: ${hostKotlinCache}`);
+            throw error;
         }
         volumeMounts.push('-v', `${hostKotlinCache}:/opt/kotlin`);
     }
     if (opts.outputDirHost) {
         const hostOutputDir = convertToDockerPath(opts.outputDirHost);
-        if (!hostOutputDir || hostOutputDir.trim() === '' || !hostOutputDir.startsWith('/')) {
+        try {
+            validateDockerPath(hostOutputDir, 'output directory');
+        } catch (error) {
             console.error(`[ERROR] Invalid hostOutputDir: "${hostOutputDir}" from outputDirHost: "${opts.outputDirHost}"`);
-            throw new Error(`Invalid Docker output directory path: ${hostOutputDir}`);
+            throw error;
         }
         volumeMounts.push('-v', `${hostOutputDir}:/output:rw`);
     }

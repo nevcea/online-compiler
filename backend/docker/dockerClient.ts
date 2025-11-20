@@ -4,16 +4,16 @@ import { CONFIG } from '../config';
 import { DockerCommandResult, DockerCommandError } from '../types';
 import { convertToDockerPath } from '../utils/pathUtils';
 import { validateImage } from '../utils/validation';
+import { createTimeoutController } from '../utils/timeout';
 
 export async function isDockerAvailable(): Promise<boolean> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), CONFIG.DOCKER_CHECK_TIMEOUT);
+    const { controller, clear } = createTimeoutController(CONFIG.DOCKER_CHECK_TIMEOUT);
     try {
         await promisify(exec)('docker version', { signal: controller.signal });
-        clearTimeout(timeoutId);
+        clear();
         return true;
     } catch {
-        clearTimeout(timeoutId);
+        clear();
         return false;
     }
 }
@@ -42,8 +42,7 @@ export async function runDockerCommand(
     const args: string[] = ['run', '--rm', `--memory=${tmpfsSize}`, `--cpus=${CONFIG.MAX_CPU_PERCENT}`, ...networkFlag, '--read-only', '--tmpfs', `/tmp:rw,exec,nosuid,size=${tmpfsSize}`, ...mounts, image, 'sh', '-c', command];
 
     const dockerCmdStr = ['docker', ...args].join(' ');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const { controller, clear } = createTimeoutController(timeout);
     const startTime = Date.now();
 
     try {
@@ -53,11 +52,11 @@ export async function runDockerCommand(
         } as any);
         const stdoutStr = typeof stdout === 'string' ? stdout : (stdout ? stdout.toString('utf8') : '');
         const stderrStr = typeof stderr === 'string' ? stderr : (stderr ? stderr.toString('utf8') : '');
-        clearTimeout(timeoutId);
+        clear();
         const elapsed = Date.now() - startTime;
         return { stdout: stdoutStr, stderr: stderrStr, elapsed, cmd: dockerCmdStr };
     } catch (error) {
-        clearTimeout(timeoutId);
+        clear();
         const elapsed = Date.now() - startTime;
         const err = error as { message?: string; code?: string | number; signal?: string | null; killed?: boolean; stderr?: Buffer | string; stdout?: Buffer | string };
         const errorStdout = typeof err.stdout === 'string' ? err.stdout : (err.stdout ? (err.stdout as Buffer).toString('utf8') : '');
