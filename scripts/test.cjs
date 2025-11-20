@@ -68,6 +68,12 @@ try {
 			allPassed = false;
 		}
 
+		if (!runCommand('npm run test',
+		                path.join(rootDir, 'backend'),
+		                'Running backend tests')) {
+			allPassed = false;
+		}
+
 		if (!runCommand('npm install',
 		                path.join(rootDir, 'frontend'),
 		                'Installing frontend dependencies')) {
