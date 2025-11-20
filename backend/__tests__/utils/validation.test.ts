@@ -35,7 +35,7 @@ describe('Validation Utilities', () => {
             expect(validateLanguage([])).toBe(false);
         });
 
-        it('should support all backend languages', () => {
+        it('should support all 17 backend languages', () => {
             const allLanguages = [
                 'python', 'javascript', 'java', 'c', 'cpp', 'csharp',
                 'go', 'rust', 'php', 'r', 'ruby', 'kotlin',
@@ -44,6 +44,13 @@ describe('Validation Utilities', () => {
             allLanguages.forEach(lang => {
                 expect(validateLanguage(lang)).toBe(true);
             });
+        });
+
+        it('should be case-insensitive', () => {
+            expect(validateLanguage('PYTHON')).toBe(true);
+            expect(validateLanguage('PyThOn')).toBe(true);
+            expect(validateLanguage('rust')).toBe(true);
+            expect(validateLanguage('RUST')).toBe(true);
         });
     });
 
