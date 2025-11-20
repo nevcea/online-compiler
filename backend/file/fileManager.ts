@@ -39,7 +39,7 @@ export async function writeCodeFile(
     }
     const resolvedCodePath = path.resolve(codePath);
     await fs.writeFile(resolvedCodePath, code, 'utf8');
-    
+
     if (language === 'java') {
         const extension = languageExtensions[language] || '.java';
         const containerPath = getContainerCodePath(language, extension, containerCodePaths);
@@ -53,7 +53,7 @@ export async function writeCodeFile(
             }
         }
     }
-    
+
     return resolvedCodePath;
 }
 

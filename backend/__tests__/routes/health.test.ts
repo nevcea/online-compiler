@@ -10,7 +10,7 @@ describe('Health Route', () => {
     beforeEach(() => {
         jsonMock = jest.fn();
         statusMock = jest.fn().mockReturnThis();
-        
+
         mockRequest = {};
         mockResponse = {
             json: jsonMock,

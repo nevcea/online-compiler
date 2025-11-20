@@ -98,7 +98,9 @@ const DEFAULT_WARMUP_TIMEOUTS: Record<string, number> = {
 
 export const WARMUP_TIMEOUTS: Record<string, number> = (() => {
     const env = process.env.WARMUP_TIMEOUTS;
-    if (!env) return DEFAULT_WARMUP_TIMEOUTS;
+    if (!env) {
+        return DEFAULT_WARMUP_TIMEOUTS;
+    }
     try {
         const parsed = JSON.parse(env);
         if (typeof parsed === 'object' && parsed !== null) {
@@ -123,7 +125,9 @@ const DEFAULT_TMPFS_SIZES: Record<string, string> = {
 
 export const TMPFS_SIZES: Record<string, string> = (() => {
     const env = process.env.TMPFS_SIZES;
-    if (!env) return DEFAULT_TMPFS_SIZES;
+    if (!env) {
+        return DEFAULT_TMPFS_SIZES;
+    }
     try {
         const parsed = JSON.parse(env);
         if (typeof parsed === 'object' && parsed !== null) {
@@ -157,7 +161,9 @@ const DEFAULT_CPU_LIMITS: Record<string, string> = {
 
 export const CPU_LIMITS: Record<string, string> = (() => {
     const env = process.env.CPU_LIMITS;
-    if (!env) return DEFAULT_CPU_LIMITS;
+    if (!env) {
+        return DEFAULT_CPU_LIMITS;
+    }
     try {
         const parsed = JSON.parse(env);
         if (typeof parsed === 'object' && parsed !== null) {
@@ -192,7 +198,9 @@ const DEFAULT_EXECUTION_TIMEOUTS: Record<string, number> = {
 
 export const EXECUTION_TIMEOUTS: Record<string, number> = (() => {
     const env = process.env.EXECUTION_TIMEOUTS;
-    if (!env) return DEFAULT_EXECUTION_TIMEOUTS;
+    if (!env) {
+        return DEFAULT_EXECUTION_TIMEOUTS;
+    }
     try {
         const parsed = JSON.parse(env);
         if (typeof parsed === 'object' && parsed !== null) {

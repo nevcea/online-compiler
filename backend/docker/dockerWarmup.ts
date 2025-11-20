@@ -231,7 +231,7 @@ export async function warmupContainer(
 
 export async function warmupAllContainers(kotlinCacheDir: string): Promise<void> {
     const { isDockerAvailable } = await import('./dockerClient');
-    
+
     if (!(await isDockerAvailable())) {
         console.warn('[WARMUP] Docker is not available. Skipping container warmup.');
         return;

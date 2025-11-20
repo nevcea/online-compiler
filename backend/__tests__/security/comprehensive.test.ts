@@ -16,7 +16,7 @@ describe('Security - Input Validation and Edge Cases', () => {
 
         it('should detect dangerous patterns with Unicode characters', () => {
             const hiddenCommands = [
-                'test\u202Emr -rf /',
+                'test\u202Emr -rf /'
             ];
             hiddenCommands.forEach(code => {
                 if (code.includes('rm') && code.includes('-rf')) {
@@ -107,7 +107,7 @@ describe('Security - Input Validation and Edge Cases', () => {
         it('should handle code exactly at length boundary', () => {
             const maxLengthCode = 'a'.repeat(100000);
             const overLengthCode = 'a'.repeat(100001);
-            
+
             expect(() => sanitizeCode(maxLengthCode)).not.toThrow();
             expect(() => sanitizeCode(overLengthCode)).toThrow('코드가 너무 깁니다.');
         });

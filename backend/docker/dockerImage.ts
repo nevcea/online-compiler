@@ -12,13 +12,13 @@ export async function checkImageExists(image: string): Promise<boolean> {
     if (!validateImage(image)) {
         return false;
     }
-    
+
     const now = Date.now();
     const cached = imageExistenceCache.get(image);
     if (cached && (now - cached.timestamp) < IMAGE_CACHE_TTL) {
         return cached.exists;
     }
-    
+
     const { controller, clear } = createTimeoutController(5000);
     try {
         const { stdout } = await promisify(exec)(`docker images -q ${image}`, {
@@ -83,7 +83,7 @@ export async function pullDockerImage(image: string, retries: number = CONFIG.DO
 
 export async function preloadDockerImages(): Promise<void> {
     const { isDockerAvailable } = await import('./dockerClient');
-    
+
     if (!(await isDockerAvailable())) {
         console.warn(
             '[PRELOAD] Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)'

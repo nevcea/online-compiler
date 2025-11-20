@@ -62,11 +62,11 @@ export function buildDockerArgs(
             ? CONFIG.MAX_CPU_PERCENT_KOTLIN
             : CPU_LIMITS[language] || CONFIG.MAX_CPU_PERCENT;
     args.push(`--cpus=${cpuLimit}`);
-    
+
     if (language !== 'typescript' && language !== 'bash') {
         args.push('--network=none');
     }
-    
+
     args.push('--read-only', '--tmpfs', `/tmp:rw,exec,nosuid,size=${tmpfsSize},noatime`);
     args.push('--cap-drop=ALL', '--security-opt', 'no-new-privileges');
     args.push('--pids-limit=128', '--ulimit', 'nofile=1024:1024');
@@ -91,20 +91,20 @@ export function buildDockerArgs(
     }
 
     const volumeMounts: string[] = [];
-    
+
     volumeMounts.push('-v', `${dockerHostDir}:/code:ro`);
 
     if (opts.inputPath) {
         const hostInputDir = path.dirname(opts.inputPath);
         const dockerInputDir = convertToDockerPath(hostInputDir);
-        
+
         try {
             validateDockerPath(dockerInputDir, 'input directory');
         } catch (error) {
             console.error(`[ERROR] Invalid dockerInputDir: "${dockerInputDir}" from hostInputDir: "${hostInputDir}"`);
             throw error;
         }
-        
+
         if (CONFIG.DEBUG_MODE) {
             console.log(
                 `[DEBUG] Input file paths: hostInputPath=${opts.inputPath}, dockerInputDir=${dockerInputDir}`
@@ -112,7 +112,7 @@ export function buildDockerArgs(
         }
         volumeMounts.push('-v', `${dockerInputDir}:/input:ro`);
     }
-    
+
     if (language === 'kotlin' && kotlinCacheDir) {
         const hostKotlinCache = convertToDockerPath(kotlinCacheDir);
         try {
@@ -133,7 +133,7 @@ export function buildDockerArgs(
         }
         volumeMounts.push('-v', `${hostOutputDir}:/output:rw`);
     }
-    
+
     args.push(...volumeMounts);
 
     if (language === 'csharp') {
@@ -142,21 +142,21 @@ export function buildDockerArgs(
 
     if (opts.inputPath) {
         const inputBasename = path.basename(opts.inputPath);
-        
+
         const inputFileCheck = !CONFIG.DEBUG_MODE
             ? `test -f "/input/${inputBasename}" || (echo "ERROR: Input file not found" >&2 && exit 1) && `
             : `echo "[DEBUG] Checking input file: /input/${inputBasename}" >&2 && if [ ! -f "/input/${inputBasename}" ]; then echo "ERROR: Input file not found: /input/${inputBasename}" >&2; ls -la /input >&2; exit 1; fi && `;
-        
+
         const fileCopy = !CONFIG.DEBUG_MODE
             ? `test -f "${mountedFilePath}" || (echo "ERROR: Source file not found" >&2 && exit 1) && cp "${mountedFilePath}" "${containerPath}" && test -f "${containerPath}" || (echo "ERROR: Copy failed" >&2 && exit 1) && `
             : `echo "[DEBUG] Checking source file: ${mountedFilePath}" >&2 && if [ ! -f "${mountedFilePath}" ]; then echo "ERROR: Source file not found: ${mountedFilePath}" >&2; ls -la /code >&2; exit 1; fi && echo "[DEBUG] Copying file to ${containerPath}" >&2 && cp "${mountedFilePath}" "${containerPath}" && echo "[DEBUG] Verifying copied file" >&2 && if [ ! -f "${containerPath}" ]; then echo "ERROR: Destination file not found after copy: ${containerPath}" >&2; ls -la /tmp >&2; exit 1; fi && if [ ! -s "${containerPath}" ]; then echo "ERROR: Destination file is empty: ${containerPath}" >&2; exit 1; fi && echo "[DEBUG] File copy successful" >&2 && `;
-        
+
         args.push(config.image, 'sh', '-c', `${inputFileCheck}${fileCopy}${command}`);
     } else {
         const fileCopy = !CONFIG.DEBUG_MODE
             ? `test -f "${mountedFilePath}" || (echo "ERROR: Source file not found" >&2 && exit 1) && cp "${mountedFilePath}" "${containerPath}" && test -f "${containerPath}" || (echo "ERROR: Copy failed" >&2 && exit 1) && `
             : `echo "[DEBUG] Checking source file: ${mountedFilePath}" >&2 && if [ ! -f "${mountedFilePath}" ]; then echo "ERROR: Source file not found: ${mountedFilePath}" >&2; ls -la /code >&2; exit 1; fi && echo "[DEBUG] Copying file to ${containerPath}" >&2 && cp "${mountedFilePath}" "${containerPath}" && echo "[DEBUG] Verifying copied file" >&2 && if [ ! -f "${containerPath}" ]; then echo "ERROR: Destination file not found after copy: ${containerPath}" >&2; ls -la /tmp >&2; exit 1; fi && if [ ! -s "${containerPath}" ]; then echo "ERROR: Destination file is empty: ${containerPath}" >&2; exit 1; fi && echo "[DEBUG] File copy successful" >&2 && `;
-        
+
         args.push(config.image, 'sh', '-c', `${fileCopy}${command}`);
     }
 

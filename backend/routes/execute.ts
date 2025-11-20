@@ -82,7 +82,7 @@ export function createExecuteRoute(
 
         try {
             sanitizeCode(code);
-            
+
             const sessionOutputDir = path.join(outputDir, sessionId);
             let finalCode = code;
             let fileExtension: string;
@@ -137,9 +137,8 @@ export function createExecuteRoute(
                         `[DEBUG] File created successfully: ${fullCodePath}, size: ${stats.size} bytes`
                     );
                 }
-            } catch (error) {
-                console.error(`[ERROR] File verification failed: ${fullCodePath}`, error);
-                const err = error as Error;
+            } catch {
+                console.error(`[ERROR] File verification failed: ${fullCodePath}`);
                 throw new Error('코드 파일 생성 또는 검증에 실패했습니다.');
             }
 

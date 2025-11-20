@@ -266,10 +266,10 @@ describe('Path Utilities', () => {
 
         it.skip('should cache results for performance', () => {
             (fs.existsSync as jest.Mock).mockReturnValue(true);
-            
+
             kotlinCompilerExistsOnHost('/tmp/kotlin_cache');
             expect(fs.existsSync).toHaveBeenCalledTimes(1);
-            
+
             kotlinCompilerExistsOnHost('/tmp/kotlin_cache');
             expect(fs.existsSync).toHaveBeenCalledTimes(1);
         });
@@ -286,7 +286,7 @@ describe('Path Utilities', () => {
             (fs.existsSync as jest.Mock).mockReturnValue(true);
             const cacheDir = '/custom/kotlin_cache';
             kotlinCompilerExistsOnHost(cacheDir);
-            
+
             const expectedPath = path.join(cacheDir, 'kotlinc', 'lib', 'kotlin-compiler.jar');
             expect(fs.existsSync).toHaveBeenCalledWith(expectedPath);
         });

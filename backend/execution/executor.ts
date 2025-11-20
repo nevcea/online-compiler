@@ -84,25 +84,25 @@ export async function executeDockerProcess(
             let error: ExecutionError | null = null;
             if (code !== 0) {
                 error = { code, killed: false, signal: null };
-                
+
                 const stderrLower = (stderr || '').toLowerCase();
-                if (stderrLower.includes("run 'docker") || 
-                    stderrLower.includes("docker:") ||
-                    stderrLower.includes("cannot connect to the docker daemon") ||
-                    stderrLower.includes("docker daemon") ||
-                    stderrLower.includes("'docker' is not recognized") ||
-                    stderrLower.includes("docker: command not found") ||
-                    stderrLower.includes("spawn docker enoent") ||
-                    stderrLower.includes("error response from daemon") ||
-                    stderrLower.includes("invalid reference format") ||
-                    stderrLower.includes("no such image") ||
-                    stderrLower.includes("permission denied")) {
+                if (stderrLower.includes('run \'docker') ||
+                    stderrLower.includes('docker:') ||
+                    stderrLower.includes('cannot connect to the docker daemon') ||
+                    stderrLower.includes('docker daemon') ||
+                    stderrLower.includes('\'docker\' is not recognized') ||
+                    stderrLower.includes('docker: command not found') ||
+                    stderrLower.includes('spawn docker enoent') ||
+                    stderrLower.includes('error response from daemon') ||
+                    stderrLower.includes('invalid reference format') ||
+                    stderrLower.includes('no such image') ||
+                    stderrLower.includes('permission denied')) {
                     error.message = stderr || 'Docker error';
                 } else if (stderr && stderr.trim()) {
                     error.message = stderr;
                 }
             }
-            
+
             await handleExecutionResult(
                 error,
                 stdout,
@@ -148,28 +148,28 @@ export async function executeDockerProcess(
 
             const errorMessage = error.message || '';
             const combinedStderr = stderr || errorMessage;
-            
+
             let executionError: ExecutionError | Error = error;
-            
-            if (errorMessage.includes('ENOENT') || 
-                errorMessage.includes('docker') || 
+
+            if (errorMessage.includes('ENOENT') ||
+                errorMessage.includes('docker') ||
                 combinedStderr.toLowerCase().includes('docker') ||
-                combinedStderr.toLowerCase().includes("run 'docker")) {
-                executionError = { 
+                combinedStderr.toLowerCase().includes('run \'docker')) {
+                executionError = {
                     message: combinedStderr || errorMessage,
                     code: null,
                     killed: false,
                     signal: null
                 } as ExecutionError;
             } else if (combinedStderr) {
-                executionError = { 
+                executionError = {
                     message: combinedStderr,
                     code: null,
                     killed: false,
                     signal: null
                 } as ExecutionError;
             }
-            
+
             await handleExecutionResult(
                 executionError,
                 stdout,
