@@ -7,6 +7,24 @@ import { OutputCollector } from './outputCollector';
 import { handleExecutionResult } from './resultHandler';
 import { cleanupFile } from '../file/fileManager';
 
+function isDockerError(stderr: string): boolean {
+    const stderrLower = stderr.toLowerCase();
+    const dockerErrorPatterns = [
+        'run \'docker',
+        'docker:',
+        'cannot connect to the docker daemon',
+        'docker daemon',
+        '\'docker\' is not recognized',
+        'docker: command not found',
+        'spawn docker enoent',
+        'error response from daemon',
+        'invalid reference format',
+        'no such image',
+        'permission denied'
+    ];
+    return dockerErrorPatterns.some(pattern => stderrLower.includes(pattern));
+}
+
 export async function executeDockerProcess(
     language: string,
     fullCodePath: string,
@@ -84,22 +102,9 @@ export async function executeDockerProcess(
             let error: ExecutionError | null = null;
             if (code !== 0) {
                 error = { code, killed: false, signal: null };
-
-                const stderrLower = (stderr || '').toLowerCase();
-                if (stderrLower.includes('run \'docker') ||
-                    stderrLower.includes('docker:') ||
-                    stderrLower.includes('cannot connect to the docker daemon') ||
-                    stderrLower.includes('docker daemon') ||
-                    stderrLower.includes('\'docker\' is not recognized') ||
-                    stderrLower.includes('docker: command not found') ||
-                    stderrLower.includes('spawn docker enoent') ||
-                    stderrLower.includes('error response from daemon') ||
-                    stderrLower.includes('invalid reference format') ||
-                    stderrLower.includes('no such image') ||
-                    stderrLower.includes('permission denied')) {
-                    error.message = stderr || 'Docker error';
-                } else if (stderr && stderr.trim()) {
-                    error.message = stderr;
+                const stderrStr = stderr || '';
+                if (stderrStr && (isDockerError(stderrStr) || stderrStr.trim())) {
+                    error.message = stderrStr || 'Docker error';
                 }
             }
 
@@ -151,10 +156,7 @@ export async function executeDockerProcess(
 
             let executionError: ExecutionError | Error = error;
 
-            if (errorMessage.includes('ENOENT') ||
-                errorMessage.includes('docker') ||
-                combinedStderr.toLowerCase().includes('docker') ||
-                combinedStderr.toLowerCase().includes('run \'docker')) {
+            if (errorMessage.includes('ENOENT') || isDockerError(combinedStderr)) {
                 executionError = {
                     message: combinedStderr || errorMessage,
                     code: null,

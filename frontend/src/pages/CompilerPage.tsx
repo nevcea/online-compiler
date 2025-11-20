@@ -9,6 +9,7 @@ import { executeCode as apiExecuteCode } from '../services/api';
 import { LANGUAGE_CONFIG } from '../config/constants';
 import { formatOutput, formatError } from '../utils/outputFormatter';
 import { mapServerErrorMessage } from '../i18n/translations';
+import { extractErrorMessage } from '../utils/errorHandler';
 import type { ProgrammingLanguage } from '../types';
 import './CompilerPage.css';
 
@@ -77,26 +78,8 @@ const CompilerPage = () => {
             }
         } catch (err) {
             setExecutionTime(Date.now() - startTime);
-            let userMessage = t('connection-error');
-            let errorType: 'error' | 'info' | 'success' | 'warning' = 'error';
-            if (err instanceof Error && err.message) {
-                const match = err.message.match(/HTTP \d+: (.+)/);
-                if (match && match[1]) {
-                    userMessage = match[1];
-                } else {
-                    const msg = err.message.toLowerCase();
-                    if (msg.includes('failed to fetch') || msg.includes('network')) {
-                        userMessage = t('cannot-connect-server');
-                    } else if (msg.includes('timeout')) {
-                        userMessage = t('request-timeout');
-                    } else if (msg.includes('400')) {
-                        userMessage = t('bad-request');
-                    } else if (msg.includes('500')) {
-                        userMessage = t('server-error');
-                    }
-                }
-            }
-            showToast(userMessage, errorType, 5000);
+            const userMessage = extractErrorMessage(err, t);
+            showToast(userMessage, 'error', 5000);
         } finally {
             setIsRunning(false);
         }

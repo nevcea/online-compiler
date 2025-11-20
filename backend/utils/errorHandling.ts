@@ -19,6 +19,47 @@ function truncateString(str: string, maxLength: number): string {
     return str;
 }
 
+interface DockerErrorCheck {
+    patterns: string[];
+    message: string;
+}
+
+const DOCKER_ERROR_CHECKS: DockerErrorCheck[] = [
+    {
+        patterns: ['cannot connect to the docker daemon', 'is the docker daemon running', 'docker daemon', 'not running'],
+        message: 'Docker가 실행되지 않았습니다. Docker Desktop을 시작한 후 다시 시도해주세요.'
+    },
+    {
+        patterns: ["'docker' is not recognized", 'docker: command not found', 'spawn docker enoent'],
+        message: 'Docker가 설치되지 않았습니다. Docker를 설치한 후 다시 시도해주세요.'
+    },
+    {
+        patterns: ['no such image', 'pull access denied', 'repository does not exist'],
+        message: 'Docker 이미지를 찾을 수 없습니다. 필요한 이미지를 다운로드 중입니다. 잠시 후 다시 시도해주세요.'
+    },
+    {
+        patterns: ['permission denied'],
+        message: 'Docker 권한 오류가 발생했습니다. Docker 권한을 확인해주세요.'
+    },
+    {
+        patterns: ['docker: invalid reference format', 'invalid reference format'],
+        message: 'Docker 명령어 형식 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+    }
+];
+
+function checkDockerError(errorStr: string): string | null {
+    const lowerError = errorStr.toLowerCase();
+    for (const check of DOCKER_ERROR_CHECKS) {
+        if (check.patterns.some(pattern => lowerError.includes(pattern))) {
+            if (check.patterns[0] === 'permission denied' && !lowerError.includes('docker')) {
+                continue;
+            }
+            return check.message;
+        }
+    }
+    return null;
+}
+
 export function filterDockerMessages(text: unknown): string {
     if (!text || typeof text !== 'string') {
         return '';
@@ -65,36 +106,12 @@ export function sanitizeErrorForUser(errorStr: unknown): string {
     console.error('[DEBUG] Original error message:', truncateString(errorStr, 500));
 
     const originalLower = errorStr.toLowerCase();
-
     let sanitized = filterDockerMessages(errorStr);
-
     const lowerSanitized = sanitized.toLowerCase();
 
-    if (lowerSanitized.includes('cannot connect to the docker daemon') ||
-        lowerSanitized.includes('is the docker daemon running') ||
-        (lowerSanitized.includes('docker daemon') && lowerSanitized.includes('not running'))) {
-        return 'Docker가 실행되지 않았습니다. Docker Desktop을 시작한 후 다시 시도해주세요.';
-    }
-
-    if (lowerSanitized.includes('\'docker\' is not recognized') ||
-        lowerSanitized.includes('docker: command not found') ||
-        lowerSanitized.includes('spawn docker enoent')) {
-        return 'Docker가 설치되지 않았습니다. Docker를 설치한 후 다시 시도해주세요.';
-    }
-
-    if (lowerSanitized.includes('no such image') ||
-        lowerSanitized.includes('pull access denied') ||
-        lowerSanitized.includes('repository does not exist')) {
-        return 'Docker 이미지를 찾을 수 없습니다. 필요한 이미지를 다운로드 중입니다. 잠시 후 다시 시도해주세요.';
-    }
-
-    if (lowerSanitized.includes('permission denied') && lowerSanitized.includes('docker')) {
-        return 'Docker 권한 오류가 발생했습니다. Docker 권한을 확인해주세요.';
-    }
-
-    if (lowerSanitized.includes('docker: invalid reference format') ||
-        lowerSanitized.includes('invalid reference format')) {
-        return 'Docker 명령어 형식 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    const dockerError = checkDockerError(errorStr);
+    if (dockerError) {
+        return dockerError;
     }
 
     if (lowerSanitized.includes('run \'docker run --help\'') ||
