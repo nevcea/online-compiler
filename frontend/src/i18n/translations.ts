@@ -168,16 +168,16 @@ export const getTranslation = (key: string, lang: Language = 'ko'): string => {
 
 export const mapServerErrorMessage = (errorMessage: string): string | null => {
     const errorLower = errorMessage.toLowerCase();
-    
-    if (errorMessage.includes('Docker가 실행되지 않았습니다') || 
+
+    if (errorMessage.includes('Docker가 실행되지 않았습니다') ||
         errorMessage.includes('Docker Desktop을 시작한 후')) {
         return 'docker-not-running';
     }
-    if (errorMessage.includes('Docker가 설치되지 않았습니다') || 
+    if (errorMessage.includes('Docker가 설치되지 않았습니다') ||
         errorMessage.includes('Docker를 설치한 후')) {
         return 'docker-not-installed';
     }
-    if (errorMessage.includes('Docker 이미지를 찾을 수 없습니다') || 
+    if (errorMessage.includes('Docker 이미지를 찾을 수 없습니다') ||
         errorMessage.includes('이미지를 다운로드 중입니다')) {
         return 'docker-image-not-found';
     }
@@ -193,31 +193,31 @@ export const mapServerErrorMessage = (errorMessage: string): string | null => {
     if (errorMessage.includes('실행 중 오류가 발생했습니다')) {
         return 'execution-error';
     }
-    
-    if (errorLower.includes('docker is not running') || 
+
+    if (errorLower.includes('docker is not running') ||
         errorLower.includes('docker daemon') && errorLower.includes('not running')) {
         return 'docker-not-running';
     }
-    if (errorLower.includes('docker is not installed') || 
+    if (errorLower.includes('docker is not installed') ||
         errorLower.includes('docker: command not found')) {
         return 'docker-not-installed';
     }
-    if (errorLower.includes('docker image not found') || 
+    if (errorLower.includes('docker image not found') ||
         errorLower.includes('no such image')) {
         return 'docker-image-not-found';
     }
-    if (errorLower.includes('docker permission') || 
+    if (errorLower.includes('docker permission') ||
         errorLower.includes('permission denied') && errorLower.includes('docker')) {
         return 'docker-permission-error';
     }
-    if (errorLower.includes('execution timeout') || 
+    if (errorLower.includes('execution timeout') ||
         errorLower.includes('timeout exceeded')) {
         return 'execution-timeout';
     }
     if (errorLower.includes('error occurred during execution')) {
         return 'execution-error';
     }
-    
+
     return null;
 };
 
