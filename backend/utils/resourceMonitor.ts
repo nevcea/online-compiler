@@ -1,30 +1,82 @@
+import { getDirectorySize, getDirectoryCount } from './resourceCleanup';
+
 interface ResourceStats {
     memory: {
         used: number;
         total: number;
         percentage: number;
+        rss: number;
+        external: number;
     };
     uptime: number;
     timestamp: number;
+    disk?: {
+        codeDir: {
+            size: number;
+            files: number;
+            directories: number;
+        };
+        outputDir: {
+            size: number;
+            files: number;
+            directories: number;
+        };
+    };
 }
 
 let startTime = Date.now();
+let codeDir: string | null = null;
+let outputDir: string | null = null;
 
-export function getResourceStats(): ResourceStats {
+export function setResourceMonitorPaths(codeDirPath: string, outputDirPath: string): void {
+    codeDir = codeDirPath;
+    outputDir = outputDirPath;
+}
+
+export async function getResourceStats(): Promise<ResourceStats> {
     const memUsage = process.memoryUsage();
     const totalMemory = memUsage.heapTotal;
     const usedMemory = memUsage.heapUsed;
     const memoryPercentage = totalMemory > 0 ? (usedMemory / totalMemory) * 100 : 0;
 
-    return {
+    const stats: ResourceStats = {
         memory: {
             used: usedMemory,
             total: totalMemory,
-            percentage: Math.round(memoryPercentage * 100) / 100
+            percentage: Math.round(memoryPercentage * 100) / 100,
+            rss: memUsage.rss,
+            external: memUsage.external || 0
         },
         uptime: Date.now() - startTime,
         timestamp: Date.now()
     };
+
+    if (codeDir && outputDir) {
+        try {
+            const [codeSize, codeCount, outputSize, outputCount] = await Promise.all([
+                getDirectorySize(codeDir),
+                getDirectoryCount(codeDir),
+                getDirectorySize(outputDir),
+                getDirectoryCount(outputDir)
+            ]);
+
+            stats.disk = {
+                codeDir: {
+                    size: codeSize,
+                    files: codeCount.files,
+                    directories: codeCount.directories
+                },
+                outputDir: {
+                    size: outputSize,
+                    files: outputCount.files,
+                    directories: outputCount.directories
+                }
+            };
+        } catch {
+        }
+    }
+
+    return stats;
 }
 
 export function formatBytes(bytes: number): string {

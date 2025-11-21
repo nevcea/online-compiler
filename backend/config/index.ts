@@ -48,6 +48,9 @@ export interface Config {
     PRELOAD_BATCH_SIZE: number;
     WARMUP_BATCH_SIZE: number;
     ERROR_MESSAGE_MAX_LENGTH: number;
+    ENABLE_CLEANUP: boolean;
+    CLEANUP_INTERVAL_MS: number;
+    SESSION_MAX_AGE_MS: number;
 }
 
 export const CONFIG: Config = {
@@ -86,7 +89,10 @@ export const CONFIG: Config = {
     DOCKER_PULL_RETRY_DELAY_BASE: parseIntegerEnv(process.env.DOCKER_PULL_RETRY_DELAY_BASE, 2000, 100, 60000),
     PRELOAD_BATCH_SIZE: parseIntegerEnv(process.env.PRELOAD_BATCH_SIZE, 3, 1, 20),
     WARMUP_BATCH_SIZE: parseIntegerEnv(process.env.WARMUP_BATCH_SIZE, 10, 1, 50),
-    ERROR_MESSAGE_MAX_LENGTH: parseIntegerEnv(process.env.ERROR_MESSAGE_MAX_LENGTH, 200, 50, 10000)
+    ERROR_MESSAGE_MAX_LENGTH: parseIntegerEnv(process.env.ERROR_MESSAGE_MAX_LENGTH, 200, 50, 10000),
+    ENABLE_CLEANUP: parseBooleanEnv(process.env.ENABLE_CLEANUP, true),
+    CLEANUP_INTERVAL_MS: parseIntegerEnv(process.env.CLEANUP_INTERVAL_MS, 60 * 60 * 1000, 5 * 60 * 1000, 24 * 60 * 60 * 1000), // 기본 1시간, 최소 5분, 최대 24시간
+    SESSION_MAX_AGE_MS: parseIntegerEnv(process.env.SESSION_MAX_AGE_MS, 24 * 60 * 60 * 1000, 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000) // 기본 24시간, 최소 1시간, 최대 7일
 };
 
 export function validateConfig(): void {
@@ -101,6 +107,12 @@ export function validateConfig(): void {
     }
     if (CONFIG.SIGKILL_DELAY_MS >= CONFIG.MAX_EXECUTION_TIME) {
         throw new Error(`SIGKILL_DELAY_MS (${CONFIG.SIGKILL_DELAY_MS}) should be less than MAX_EXECUTION_TIME (${CONFIG.MAX_EXECUTION_TIME})`);
+    }
+    if (CONFIG.CLEANUP_INTERVAL_MS < 5 * 60 * 1000) {
+        throw new Error(`CLEANUP_INTERVAL_MS (${CONFIG.CLEANUP_INTERVAL_MS}) should be at least 5 minutes`);
+    }
+    if (CONFIG.SESSION_MAX_AGE_MS < 60 * 60 * 1000) {
+        throw new Error(`SESSION_MAX_AGE_MS (${CONFIG.SESSION_MAX_AGE_MS}) should be at least 1 hour`);
     }
 }
 

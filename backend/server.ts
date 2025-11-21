@@ -10,6 +10,8 @@ import { executeLimiter, executeHourlyLimiter, healthLimiter } from './middlewar
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { createExecuteRoute } from './routes/execute';
 import { healthRoute } from './routes/health';
+import { createCleanupScheduler } from './utils/cleanupScheduler';
+import { setResourceMonitorPaths } from './utils/resourceMonitor';
 
 const app = express();
 
@@ -104,9 +106,7 @@ function setupRoutes(app: express.Application): void {
 }
 
 function setupErrorHandling(app: express.Application): void {
-    // 404 핸들러는 라우트 설정 후에 추가
     app.use(notFoundHandler);
-    // 에러 핸들러는 마지막에 추가
     app.use(errorHandler);
 }
 
@@ -126,7 +126,6 @@ function startHttpServer(): void {
 const isProduction = isProductionEnv();
 console.log(`[SERVER] NODE_ENV=${process.env.NODE_ENV || 'undefined'} isProduction=${isProduction}`);
 
-// 설정 검증
 try {
     validateConfig();
     console.log('[SERVER] Configuration validated successfully');
@@ -150,6 +149,22 @@ ensureDirectories(codeDir, outputDir, toolCacheDir, kotlinCacheDir, kotlinBuilds
         console.log('[SERVER] Directories ready. Starting Kotlin warmup (if needed)...');
         await warmupKotlinOnStart(kotlinCacheDir);
         console.log('[SERVER] Kotlin warmup finished. Starting HTTP server...');
+
+        setResourceMonitorPaths(codeDir, outputDir);
+
+        const cleanupScheduler = createCleanupScheduler(codeDir, outputDir);
+        cleanupScheduler.start();
+
+        process.on('SIGTERM', () => {
+            console.log('[SERVER] SIGTERM received, stopping cleanup scheduler...');
+            cleanupScheduler.stop();
+        });
+
+        process.on('SIGINT', () => {
+            console.log('[SERVER] SIGINT received, stopping cleanup scheduler...');
+            cleanupScheduler.stop();
+        });
+
         startHttpServer();
     })
     .catch((e: unknown) => {

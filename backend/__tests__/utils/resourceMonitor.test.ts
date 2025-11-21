@@ -2,8 +2,8 @@ import { getResourceStats, formatBytes, formatUptime } from '../../utils/resourc
 
 describe('Resource Monitor', () => {
     describe('getResourceStats', () => {
-        it('should return resource statistics', () => {
-            const stats = getResourceStats();
+        it('should return resource statistics', async () => {
+            const stats = await getResourceStats();
 
             expect(stats).toHaveProperty('memory');
             expect(stats).toHaveProperty('uptime');
@@ -26,9 +26,9 @@ describe('Resource Monitor', () => {
         });
 
         it('should return increasing uptime', async () => {
-            const stats1 = getResourceStats();
+            const stats1 = await getResourceStats();
             await new Promise(resolve => setTimeout(resolve, 100));
-            const stats2 = getResourceStats();
+            const stats2 = await getResourceStats();
 
             expect(stats2.uptime).toBeGreaterThanOrEqual(stats1.uptime);
         });

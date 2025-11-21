@@ -11,8 +11,8 @@ describe('Health Route', () => {
         mockResponse = createMockResponse();
     });
 
-    it('should return status ok', () => {
-        healthRoute(mockRequest as Request, mockResponse as Response);
+    it('should return status ok', async () => {
+        await healthRoute(mockRequest as Request, mockResponse as Response);
 
         expect(mockResponse.json).toHaveBeenCalledTimes(1);
         const callArgs = mockResponse.json.mock.calls[0][0];
@@ -23,14 +23,14 @@ describe('Health Route', () => {
         expect(callArgs).toHaveProperty('timestamp');
     });
 
-    it('should not call status method', () => {
-        healthRoute(mockRequest as Request, mockResponse as Response);
+    it('should not call status method', async () => {
+        await healthRoute(mockRequest as Request, mockResponse as Response);
 
         expect(mockResponse.status).not.toHaveBeenCalled();
     });
 
-    it('should return object with status property', () => {
-        healthRoute(mockRequest as Request, mockResponse as Response);
+    it('should return object with status property', async () => {
+        await healthRoute(mockRequest as Request, mockResponse as Response);
 
         const callArgs = mockResponse.json.mock.calls[0][0];
         expect(callArgs).toHaveProperty('status');
@@ -43,10 +43,10 @@ describe('Health Route', () => {
         expect(callArgs.resources).toHaveProperty('uptime');
     });
 
-    it('should handle multiple consecutive calls', () => {
-        healthRoute(mockRequest as Request, mockResponse as Response);
-        healthRoute(mockRequest as Request, mockResponse as Response);
-        healthRoute(mockRequest as Request, mockResponse as Response);
+    it('should handle multiple consecutive calls', async () => {
+        await healthRoute(mockRequest as Request, mockResponse as Response);
+        await healthRoute(mockRequest as Request, mockResponse as Response);
+        await healthRoute(mockRequest as Request, mockResponse as Response);
 
         expect(mockResponse.json).toHaveBeenCalledTimes(3);
         mockResponse.json.mock.calls.forEach((call: any[]) => {
@@ -57,14 +57,14 @@ describe('Health Route', () => {
         });
     });
 
-    it('should work with different request objects', () => {
+    it('should work with different request objects', async () => {
         const req1 = createMockRequest({ query: { test: 'value' } });
         const req2 = createMockRequest({ params: { id: '123' } });
         const req3 = createMockRequest({ body: { data: 'test' } });
 
-        healthRoute(req1 as Request, mockResponse as Response);
-        healthRoute(req2 as Request, mockResponse as Response);
-        healthRoute(req3 as Request, mockResponse as Response);
+        await healthRoute(req1 as Request, mockResponse as Response);
+        await healthRoute(req2 as Request, mockResponse as Response);
+        await healthRoute(req3 as Request, mockResponse as Response);
 
         expect(mockResponse.json).toHaveBeenCalledTimes(3);
         mockResponse.json.mock.calls.forEach((call: any[]) => {
@@ -73,10 +73,11 @@ describe('Health Route', () => {
         });
     });
 
-    it('should return JSON response synchronously', () => {
+    it('should return Promise', async () => {
         const result = healthRoute(mockRequest as Request, mockResponse as Response);
 
-        expect(result).toBeUndefined();
+        expect(result).toBeInstanceOf(Promise);
+        await result;
         expect(mockResponse.json).toHaveBeenCalled();
     });
 });
