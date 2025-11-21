@@ -90,12 +90,16 @@ export async function preloadDockerImages(): Promise<void> {
         );
         return;
     }
-    console.log('[PRELOAD] Starting Docker images preload...');
+    if (CONFIG.DEBUG_MODE) {
+        console.log('[PRELOAD] Starting Docker images preload...');
+    }
     const startTime = Date.now();
     const images = Object.values(LANGUAGE_CONFIGS).map((config) => config.image);
     const uniqueImages = [...new Set(images)];
 
-    console.log(`[PRELOAD] Checking ${uniqueImages.length} unique images...`);
+    if (CONFIG.DEBUG_MODE) {
+        console.log(`[PRELOAD] Checking ${uniqueImages.length} unique images...`);
+    }
 
     const checkPromises = uniqueImages.map(async (image) => {
         const exists = await checkImageExists(image);
@@ -106,18 +110,21 @@ export async function preloadDockerImages(): Promise<void> {
     const imagesToPull = checkResults.filter(({ exists }) => !exists).map(({ image }) => image);
     const existingImages = checkResults.filter(({ exists }) => exists).map(({ image }) => image);
 
-    if (existingImages.length > 0) {
-        console.log(
-            `[PRELOAD] ${existingImages.length} images already exist: ${existingImages.join(', ')}`
-        );
-    }
-
     if (imagesToPull.length === 0) {
-        console.log('[PRELOAD] All required images are already available!');
+        if (CONFIG.DEBUG_MODE) {
+            console.log('[PRELOAD] All required images are already available!');
+        }
         return;
     }
 
-    console.log(`[PRELOAD] Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
+    if (CONFIG.DEBUG_MODE) {
+        if (existingImages.length > 0) {
+            console.log(
+                `[PRELOAD] ${existingImages.length} images already exist: ${existingImages.join(', ')}`
+            );
+        }
+        console.log(`[PRELOAD] Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
+    }
 
     const results: PullResult[] = [];
 

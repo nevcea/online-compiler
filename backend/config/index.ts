@@ -79,7 +79,7 @@ export const CONFIG: Config = {
     TRUST_PROXY: parseBooleanEnv(process.env.TRUST_PROXY, false),
     DEBUG_MODE: process.env.DEBUG
         ? parseBooleanEnv(process.env.DEBUG, false)
-        : process.env.NODE_ENV !== 'production',
+        : false,
     TIMEOUT_BUFFER_MS: parseIntegerEnv(process.env.TIMEOUT_BUFFER_MS, 2000, 0, 60000),
     SIGKILL_DELAY_MS: parseIntegerEnv(process.env.SIGKILL_DELAY_MS, 2000, 0, 60000),
     MAX_BUFFER_SIZE: parseIntegerEnv(process.env.MAX_BUFFER_SIZE, 2 * 1024 * 1024, 1024, 100 * 1024 * 1024),

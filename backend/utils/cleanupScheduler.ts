@@ -25,7 +25,9 @@ class CleanupSchedulerImpl implements CleanupScheduler {
         }
 
         this.isActive = true;
-        console.log(`[CLEANUP] Starting cleanup scheduler (interval: ${CONFIG.CLEANUP_INTERVAL_MS}ms, max age: ${CONFIG.SESSION_MAX_AGE_MS}ms)`);
+        if (CONFIG.DEBUG_MODE) {
+            console.log(`[CLEANUP] Starting cleanup scheduler (interval: ${CONFIG.CLEANUP_INTERVAL_MS}ms, max age: ${CONFIG.SESSION_MAX_AGE_MS}ms)`);
+        }
 
         this.runCleanup().catch((error) => {
             console.error('[CLEANUP] Initial cleanup failed:', error);
@@ -65,7 +67,7 @@ class CleanupSchedulerImpl implements CleanupScheduler {
         const stats = await cleanupOldSessions(this.codeDir, this.outputDir, CONFIG.SESSION_MAX_AGE_MS);
         const duration = Date.now() - startTime;
 
-        if (CONFIG.DEBUG_MODE || stats.filesDeleted > 0 || stats.directoriesDeleted > 0) {
+        if (stats.filesDeleted > 0 || stats.directoriesDeleted > 0 || stats.errors > 0) {
             console.log(`[CLEANUP] Cleanup completed in ${duration}ms:`, {
                 filesDeleted: stats.filesDeleted,
                 directoriesDeleted: stats.directoriesDeleted,

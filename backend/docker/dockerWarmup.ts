@@ -237,7 +237,9 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
         return;
     }
     const configs = getWarmupConfigs(kotlinCacheDir);
-    console.log(`[WARMUP] Warming up ${configs.length} containers...`);
+    if (CONFIG.DEBUG_MODE) {
+        console.log(`[WARMUP] Warming up ${configs.length} containers...`);
+    }
     const startTime = Date.now();
 
     const results: WarmupResult[] = [];
@@ -248,24 +250,26 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
         const batchResults = await Promise.all(batchPromises);
         results.push(...batchResults);
 
-        const successCount = batchResults.filter((r) => r.success).length;
-        const failCount = batchResults.filter((r) => !r.success).length;
-        const succeededLanguages = batchResults.filter((r) => r.success).map((r) => r.language);
-        const failedLanguages = batchResults.filter((r) => !r.success).map((r) => r.language);
-        const batchNumber = Math.floor(i / CONFIG.WARMUP_BATCH_SIZE) + 1;
+        if (CONFIG.DEBUG_MODE) {
+            const successCount = batchResults.filter((r) => r.success).length;
+            const failCount = batchResults.filter((r) => !r.success).length;
+            const succeededLanguages = batchResults.filter((r) => r.success).map((r) => r.language);
+            const failedLanguages = batchResults.filter((r) => !r.success).map((r) => r.language);
+            const batchNumber = Math.floor(i / CONFIG.WARMUP_BATCH_SIZE) + 1;
 
-        if (successCount > 0 && failCount > 0) {
-            console.log(`[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded`);
-            console.log(`[WARMUP]   Succeeded: ${succeededLanguages.join(', ')}`);
-            console.log(`[WARMUP]   Failed: ${failedLanguages.join(', ')}`);
-        } else if (successCount > 0) {
-            console.log(
-                `[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${succeededLanguages.join(', ')})`
-            );
-        } else {
-            console.log(
-                `[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${failedLanguages.join(', ')})`
-            );
+            if (successCount > 0 && failCount > 0) {
+                console.log(`[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded`);
+                console.log(`[WARMUP]   Succeeded: ${succeededLanguages.join(', ')}`);
+                console.log(`[WARMUP]   Failed: ${failedLanguages.join(', ')}`);
+            } else if (successCount > 0) {
+                console.log(
+                    `[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${succeededLanguages.join(', ')})`
+                );
+            } else {
+                console.log(
+                    `[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${failedLanguages.join(', ')})`
+                );
+            }
         }
     }
 
@@ -292,13 +296,17 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
         const avgElapsed =
             results.filter((r) => r.success).reduce((sum, r) => sum + (r.elapsed || 0), 0) /
             totalSuccess;
-        console.log(
-            `[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded (avg: ${avgElapsed.toFixed(0)}ms)`
-        );
+        if (CONFIG.DEBUG_MODE) {
+            console.log(
+                `[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded (avg: ${avgElapsed.toFixed(0)}ms)`
+            );
+        }
     } else {
-        console.log(
-            `[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded`
-        );
+        if (CONFIG.DEBUG_MODE) {
+            console.log(
+                `[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded`
+            );
+        }
     }
 }
 
