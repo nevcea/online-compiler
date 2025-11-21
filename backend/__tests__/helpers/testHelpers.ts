@@ -11,6 +11,7 @@ export interface MockResponse extends Partial<Response> {
     json: jest.Mock;
     status: jest.Mock;
     send: jest.Mock;
+    headersSent: boolean;
 }
 
 export function createMockRequest(overrides: Partial<MockRequest> = {}): MockRequest {
@@ -19,11 +20,13 @@ export function createMockRequest(overrides: Partial<MockRequest> = {}): MockReq
         query: {},
         params: {},
         headers: {},
+        path: '/',
+        method: 'GET',
         ...overrides
     };
 }
 
-export function createMockResponse(): MockResponse {
+export function createMockResponse(overrides: Partial<MockResponse> = {}): MockResponse {
     const jsonMock = jest.fn();
     const statusMock = jest.fn().mockReturnThis();
     const sendMock = jest.fn();
@@ -31,7 +34,9 @@ export function createMockResponse(): MockResponse {
     return {
         json: jsonMock,
         status: statusMock,
-        send: sendMock
+        send: sendMock,
+        headersSent: false,
+        ...overrides
     };
 }
 

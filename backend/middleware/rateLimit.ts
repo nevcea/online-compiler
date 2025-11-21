@@ -1,8 +1,9 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
+import { parseIntegerEnv } from '../utils/envValidation';
 
-const MAX_EXECUTIONS_PER_MINUTE = parseInt(process.env.MAX_EXECUTIONS_PER_MINUTE || '20', 10);
-const MAX_EXECUTIONS_PER_HOUR = parseInt(process.env.MAX_EXECUTIONS_PER_HOUR || '100', 10);
+const MAX_EXECUTIONS_PER_MINUTE = parseIntegerEnv(process.env.MAX_EXECUTIONS_PER_MINUTE, 20, 1, 1000);
+const MAX_EXECUTIONS_PER_HOUR = parseIntegerEnv(process.env.MAX_EXECUTIONS_PER_HOUR, 100, 1, 10000);
 
 export const executeLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,

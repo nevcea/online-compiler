@@ -16,6 +16,7 @@ import {
     buildHaskellCommand,
     buildBashCommand
 } from './languageCommands';
+import { parseIntegerEnv, parseBooleanEnv, validateMemorySize, validateCpuPercent } from '../utils/envValidation';
 
 const MAX_EXECUTION_TIME = 10000;
 
@@ -50,31 +51,58 @@ export interface Config {
 }
 
 export const CONFIG: Config = {
-    PORT: parseInt(process.env.PORT || '4000', 10),
+    PORT: parseIntegerEnv(process.env.PORT, 4000, 1, 65535),
     MAX_CODE_LENGTH: 100000,
     MAX_EXECUTION_TIME: MAX_EXECUTION_TIME,
-    MAX_MEMORY: '256m',
-    MAX_CPU_PERCENT: '2.0',
-    MAX_CPU_PERCENT_KOTLIN: '3.0',
-    MAX_OUTPUT_BYTES: parseInt(process.env.MAX_OUTPUT_BYTES || '1048576', 10),
-    MAX_INPUT_LENGTH: parseInt(process.env.MAX_INPUT_LENGTH || '1000000', 10),
-    ENABLE_PRELOAD: (process.env.ENABLE_PRELOAD || 'true').toLowerCase() === 'true',
-    ENABLE_WARMUP: (process.env.ENABLE_WARMUP || 'true').toLowerCase() === 'true',
-    TRUST_PROXY: (process.env.TRUST_PROXY || 'false').toLowerCase() === 'true',
+    MAX_MEMORY: (() => {
+        const memory = process.env.MAX_MEMORY || '256m';
+        validateMemorySize(memory);
+        return memory;
+    })(),
+    MAX_CPU_PERCENT: (() => {
+        const cpu = process.env.MAX_CPU_PERCENT || '2.0';
+        validateCpuPercent(cpu);
+        return cpu;
+    })(),
+    MAX_CPU_PERCENT_KOTLIN: (() => {
+        const cpu = process.env.MAX_CPU_PERCENT_KOTLIN || '3.0';
+        validateCpuPercent(cpu);
+        return cpu;
+    })(),
+    MAX_OUTPUT_BYTES: parseIntegerEnv(process.env.MAX_OUTPUT_BYTES, 1048576, 1024, 100 * 1024 * 1024),
+    MAX_INPUT_LENGTH: parseIntegerEnv(process.env.MAX_INPUT_LENGTH, 1000000, 1, 10 * 1000000),
+    ENABLE_PRELOAD: parseBooleanEnv(process.env.ENABLE_PRELOAD, true),
+    ENABLE_WARMUP: parseBooleanEnv(process.env.ENABLE_WARMUP, true),
+    TRUST_PROXY: parseBooleanEnv(process.env.TRUST_PROXY, false),
     DEBUG_MODE: process.env.DEBUG
-        ? process.env.DEBUG.toLowerCase() === 'true'
+        ? parseBooleanEnv(process.env.DEBUG, false)
         : process.env.NODE_ENV !== 'production',
-    TIMEOUT_BUFFER_MS: 2000,
-    SIGKILL_DELAY_MS: 2000,
-    MAX_BUFFER_SIZE: 2 * 1024 * 1024,
-    DOCKER_CHECK_TIMEOUT: 3000,
-    DOCKER_PULL_TIMEOUT: 300000,
-    DOCKER_PULL_RETRIES: 2,
-    DOCKER_PULL_RETRY_DELAY_BASE: 2000,
-    PRELOAD_BATCH_SIZE: 3,
-    WARMUP_BATCH_SIZE: 10,
-    ERROR_MESSAGE_MAX_LENGTH: 200
+    TIMEOUT_BUFFER_MS: parseIntegerEnv(process.env.TIMEOUT_BUFFER_MS, 2000, 0, 60000),
+    SIGKILL_DELAY_MS: parseIntegerEnv(process.env.SIGKILL_DELAY_MS, 2000, 0, 60000),
+    MAX_BUFFER_SIZE: parseIntegerEnv(process.env.MAX_BUFFER_SIZE, 2 * 1024 * 1024, 1024, 100 * 1024 * 1024),
+    DOCKER_CHECK_TIMEOUT: parseIntegerEnv(process.env.DOCKER_CHECK_TIMEOUT, 3000, 1000, 60000),
+    DOCKER_PULL_TIMEOUT: parseIntegerEnv(process.env.DOCKER_PULL_TIMEOUT, 300000, 10000, 1800000),
+    DOCKER_PULL_RETRIES: parseIntegerEnv(process.env.DOCKER_PULL_RETRIES, 2, 0, 10),
+    DOCKER_PULL_RETRY_DELAY_BASE: parseIntegerEnv(process.env.DOCKER_PULL_RETRY_DELAY_BASE, 2000, 100, 60000),
+    PRELOAD_BATCH_SIZE: parseIntegerEnv(process.env.PRELOAD_BATCH_SIZE, 3, 1, 20),
+    WARMUP_BATCH_SIZE: parseIntegerEnv(process.env.WARMUP_BATCH_SIZE, 10, 1, 50),
+    ERROR_MESSAGE_MAX_LENGTH: parseIntegerEnv(process.env.ERROR_MESSAGE_MAX_LENGTH, 200, 50, 10000)
 };
+
+export function validateConfig(): void {
+    if (CONFIG.MAX_CODE_LENGTH < 1) {
+        throw new Error(`MAX_CODE_LENGTH must be >= 1, got: ${CONFIG.MAX_CODE_LENGTH}`);
+    }
+    if (CONFIG.MAX_EXECUTION_TIME < 1000) {
+        throw new Error(`MAX_EXECUTION_TIME must be >= 1000ms, got: ${CONFIG.MAX_EXECUTION_TIME}`);
+    }
+    if (CONFIG.TIMEOUT_BUFFER_MS >= CONFIG.MAX_EXECUTION_TIME) {
+        throw new Error(`TIMEOUT_BUFFER_MS (${CONFIG.TIMEOUT_BUFFER_MS}) should be less than MAX_EXECUTION_TIME (${CONFIG.MAX_EXECUTION_TIME})`);
+    }
+    if (CONFIG.SIGKILL_DELAY_MS >= CONFIG.MAX_EXECUTION_TIME) {
+        throw new Error(`SIGKILL_DELAY_MS (${CONFIG.SIGKILL_DELAY_MS}) should be less than MAX_EXECUTION_TIME (${CONFIG.MAX_EXECUTION_TIME})`);
+    }
+}
 
 const DEFAULT_WARMUP_TIMEOUTS: Record<string, number> = {
     python: 10000,

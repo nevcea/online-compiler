@@ -6,6 +6,7 @@ import { buildDockerArgs } from '../docker/dockerArgs';
 import { OutputCollector } from './outputCollector';
 import { handleExecutionResult } from './resultHandler';
 import { cleanupFile } from '../file/fileManager';
+import { safeSendErrorResponse } from '../middleware/errorHandler';
 
 function isDockerError(stderr: string): boolean {
     const stderrLower = stderr.toLowerCase();
@@ -34,8 +35,6 @@ export async function executeDockerProcess(
     res: Response,
     sessionOutputDir: string,
     fullInputPath: string | null,
-    getResponseSent: () => boolean,
-    setResponseSent: (value: boolean) => void,
     kotlinCacheDir?: string
 ): Promise<void> {
     const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions, kotlinCacheDir);
@@ -73,7 +72,7 @@ export async function executeDockerProcess(
 
     let responseHandled = false;
     const markResponseHandled = (): boolean => {
-        if (responseHandled) {
+        if (responseHandled || res.headersSent) {
             return false;
         }
         responseHandled = true;
@@ -116,18 +115,10 @@ export async function executeDockerProcess(
                 res,
                 sessionOutputDir
             );
-            setResponseSent(true);
         } catch (err) {
             console.error('[ERROR] Error in handleClose:', err);
-            if (!getResponseSent()) {
-                try {
-                    res.status(500).json({
-                        error: 'An error occurred while processing execution result.'
-                    });
-                    setResponseSent(true);
-                } catch (sendErr) {
-                    console.error('[ERROR] Failed to send error response:', sendErr);
-                }
+            if (!res.headersSent) {
+                safeSendErrorResponse(res, 500, '실행 결과 처리 중 오류가 발생했습니다.');
             }
         }
     };
@@ -180,18 +171,10 @@ export async function executeDockerProcess(
                 res,
                 sessionOutputDir
             );
-            setResponseSent(true);
         } catch (err) {
             console.error('[ERROR] Error in handleError:', err);
-            if (!getResponseSent()) {
-                try {
-                    res.status(500).json({
-                        error: 'An error occurred while processing execution error.'
-                    });
-                    setResponseSent(true);
-                } catch (sendErr) {
-                    console.error('[ERROR] Failed to send error response:', sendErr);
-                }
+            if (!res.headersSent) {
+                safeSendErrorResponse(res, 500, '실행 에러 처리 중 오류가 발생했습니다.');
             }
         }
     };
@@ -200,7 +183,7 @@ export async function executeDockerProcess(
     dockerProcess.on('error', handleError);
 
     const processTimeoutId = setTimeout(async () => {
-        if (responseHandled || getResponseSent()) {
+        if (responseHandled || res.headersSent) {
             return;
         }
         if (!dockerProcess || dockerProcess.killed) {

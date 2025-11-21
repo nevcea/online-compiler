@@ -2,11 +2,12 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors, { CorsOptions } from 'cors';
 import helmet from 'helmet';
 import path from 'path';
-import { CONFIG } from './config';
+import { CONFIG, validateConfig } from './config';
 import { ensureDirectories } from './file/fileManager';
 import { preloadDockerImages } from './docker/dockerImage';
 import { warmupKotlinOnStart, warmupContainers } from './docker/dockerWarmup';
 import { executeLimiter, executeHourlyLimiter, healthLimiter } from './middleware/rateLimit';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { createExecuteRoute } from './routes/execute';
 import { healthRoute } from './routes/health';
 
@@ -103,10 +104,10 @@ function setupRoutes(app: express.Application): void {
 }
 
 function setupErrorHandling(app: express.Application): void {
-    app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-        console.error('Unhandled error:', err.message || 'Unknown error');
-        res.status(500).json({ error: 'Internal server error' });
-    });
+    // 404 핸들러는 라우트 설정 후에 추가
+    app.use(notFoundHandler);
+    // 에러 핸들러는 마지막에 추가
+    app.use(errorHandler);
 }
 
 function startHttpServer(): void {
@@ -124,6 +125,15 @@ function startHttpServer(): void {
 
 const isProduction = isProductionEnv();
 console.log(`[SERVER] NODE_ENV=${process.env.NODE_ENV || 'undefined'} isProduction=${isProduction}`);
+
+// 설정 검증
+try {
+    validateConfig();
+    console.log('[SERVER] Configuration validated successfully');
+} catch (error) {
+    console.error('[SERVER] Configuration validation failed:', error);
+    process.exit(1);
+}
 
 setupMiddlewares(app, isProduction);
 setupRoutes(app);

@@ -6,6 +6,7 @@ import { ExecuteRequestBody, BuildOptions } from '../types';
 import { validateLanguage, sanitizeCode, validateJavaClass } from '../utils/validation';
 import { normalizePath } from '../utils/pathUtils';
 import { sanitizeError } from '../utils/errorHandling';
+import { safeSendErrorResponse } from '../middleware/errorHandler';
 import { cleanupFile, writeInputFile, writeCodeFile, generateSessionId } from '../file/fileManager';
 import { executeDockerProcess } from '../execution/executor';
 import { warmupKotlinOnStart } from '../docker/dockerWarmup';
@@ -30,34 +31,24 @@ export function createExecuteRoute(
 ) {
     return async (req: Request<{}, {}, ExecuteRequestBody>, res: Response): Promise<void> => {
         const { code, language, input = '' } = req.body;
-        let responseSent = false;
-
-        const sendResponse = (statusCode: number, data: object): void => {
-            if (!responseSent) {
-                responseSent = true;
-                res.status(statusCode).json(data);
-            }
-        };
 
         if (!code || !language) {
-            sendResponse(400, { error: '코드와 언어는 필수입니다.' });
+            safeSendErrorResponse(res, 400, '코드와 언어는 필수입니다.');
             return;
         }
 
         if (typeof code !== 'string' || typeof language !== 'string') {
-            sendResponse(400, { error: '잘못된 입력 형식입니다.' });
+            safeSendErrorResponse(res, 400, '잘못된 입력 형식입니다.');
             return;
         }
 
         if (code.length > CONFIG.MAX_CODE_LENGTH) {
-            sendResponse(400, {
-                error: `코드 길이가 최대 ${CONFIG.MAX_CODE_LENGTH}자를 초과했습니다.`
-            });
+            safeSendErrorResponse(res, 400, `코드 길이가 최대 ${CONFIG.MAX_CODE_LENGTH}자를 초과했습니다.`);
             return;
         }
 
         if (!validateLanguage(language)) {
-            sendResponse(400, { error: '지원하지 않는 언어입니다.' });
+            safeSendErrorResponse(res, 400, '지원하지 않는 언어입니다.');
             return;
         }
 
@@ -70,9 +61,7 @@ export function createExecuteRoute(
             inputText = String(input);
         }
         if (inputText.length > CONFIG.MAX_INPUT_LENGTH) {
-            sendResponse(400, {
-                error: `입력 길이가 최대 ${CONFIG.MAX_INPUT_LENGTH}자를 초과했습니다.`
-            });
+            safeSendErrorResponse(res, 400, `입력 길이가 최대 ${CONFIG.MAX_INPUT_LENGTH}자를 초과했습니다.`);
             return;
         }
 
@@ -149,9 +138,7 @@ export function createExecuteRoute(
                     warmupKotlinOnStart(kotlinCacheDir).catch(() => {});
                     await cleanupFile(fullCodePath);
                     await fs.rm(sessionOutputDir, { recursive: true, force: true }).catch(() => {});
-                    sendResponse(503, {
-                        error: 'Kotlin 컴파일러가 아직 준비되지 않았습니다. 준비 중입니다. 잠시 후 다시 시도해주세요.'
-                    });
+                    safeSendErrorResponse(res, 503, 'Kotlin 컴파일러가 아직 준비되지 않았습니다. 준비 중입니다. 잠시 후 다시 시도해주세요.');
                     return;
                 }
             }
@@ -171,7 +158,6 @@ export function createExecuteRoute(
 
             const config = LANGUAGE_CONFIGS[language];
             const startTime = Date.now();
-            let executionResponseSent = false;
 
             if (!fullCodePath) {
                 console.error('[ERROR] Code path is null');
@@ -192,10 +178,6 @@ export function createExecuteRoute(
                         res,
                         sessionOutputDir,
                         fullInputPath,
-                        () => executionResponseSent,
-                        (value) => {
-                            executionResponseSent = value;
-                        },
                         kotlinCacheDir
                     );
                 },
@@ -206,8 +188,14 @@ export function createExecuteRoute(
             if (fullInputPath) {
                 await cleanupFile(fullInputPath);
             }
-            const sanitizedError = sanitizeError(error);
-            sendResponse(400, { error: sanitizedError });
+
+            if (!res.headersSent) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const sanitizedError = sanitizeError(errorMessage);
+                safeSendErrorResponse(res, 400, sanitizedError || '요청 처리 중 오류가 발생했습니다.');
+            } else {
+                console.error('[ERROR] Error occurred after response was sent:', error);
+            }
         }
     };
 }
