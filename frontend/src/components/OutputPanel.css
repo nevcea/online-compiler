@@ -128,14 +128,29 @@
 }
 
 .execution-time {
+    display: inline-flex;
+    align-items: center;
     font-size: 0.7rem;
     color: var(--text-muted);
     font-family: 'Courier New', Courier, 'Consolas', 'Monaco', monospace;
     font-weight: 500;
-    padding: 0.125rem 0.5rem;
+    padding: 0.25rem 0.625rem;
     background: var(--bg-secondary);
     border-radius: 4px;
     border: 1px solid var(--border-color);
+    gap: 0.25rem;
+    transition: all 0.2s ease;
+}
+
+.execution-time svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.execution-time:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
 }
 
 .output-content {

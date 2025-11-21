@@ -1,4 +1,5 @@
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
 import { Response } from 'express';
 import { CONFIG, LanguageConfig } from '../config';
 import { BuildOptions, ExecutionError } from '../types';
@@ -7,6 +8,8 @@ import { OutputCollector } from './outputCollector';
 import { handleExecutionResult } from './resultHandler';
 import { cleanupFile } from '../file/fileManager';
 import { safeSendErrorResponse } from '../middleware/errorHandler';
+
+const execAsync = promisify(exec);
 
 function isDockerError(stderr: string): boolean {
     const stderrLower = stderr.toLowerCase();
@@ -37,7 +40,7 @@ export async function executeDockerProcess(
     fullInputPath: string | null,
     kotlinCacheDir?: string
 ): Promise<void> {
-    const dockerArgs = buildDockerArgs(language, fullCodePath, buildOptions, kotlinCacheDir);
+    const { args: dockerArgs, containerName } = buildDockerArgs(language, fullCodePath, buildOptions, kotlinCacheDir);
 
     if (CONFIG.DEBUG_MODE) {
         console.log('[EXECUTE] Starting Docker execution', {
@@ -59,6 +62,10 @@ export async function executeDockerProcess(
 
     dockerProcess.stdout.setEncoding('utf8');
     dockerProcess.stderr.setEncoding('utf8');
+
+    if (CONFIG.DEBUG_MODE) {
+        console.log('[DEBUG] Container name:', containerName);
+    }
 
     const outputCollector = new OutputCollector(CONFIG.MAX_OUTPUT_BYTES);
 
@@ -86,6 +93,12 @@ export async function executeDockerProcess(
 
         try {
             const executionTime = Date.now() - startTime;
+
+            try {
+                await execAsync(`docker rm -f ${containerName} 2>/dev/null || true`);
+            } catch {
+            }
+
             await cleanupResources(fullCodePath, fullInputPath);
 
             const { stdout, stderr } = outputCollector.getFinalOutput();
@@ -117,6 +130,10 @@ export async function executeDockerProcess(
             );
         } catch (err) {
             console.error('[ERROR] Error in handleClose:', err);
+            try {
+                await execAsync(`docker rm -f ${containerName} 2>/dev/null || true`);
+            } catch {
+            }
             if (!res.headersSent) {
                 safeSendErrorResponse(res, 500, '실행 결과 처리 중 오류가 발생했습니다.');
             }
@@ -130,6 +147,12 @@ export async function executeDockerProcess(
 
         try {
             const executionTime = Date.now() - startTime;
+
+            try {
+                await execAsync(`docker rm -f ${containerName} 2>/dev/null || true`);
+            } catch {
+            }
+
             await cleanupResources(fullCodePath, fullInputPath);
 
             const { stdout, stderr } = outputCollector.getFinalOutput();
@@ -173,6 +196,10 @@ export async function executeDockerProcess(
             );
         } catch (err) {
             console.error('[ERROR] Error in handleError:', err);
+            try {
+                await execAsync(`docker rm -f ${containerName} 2>/dev/null || true`);
+            } catch {
+            }
             if (!res.headersSent) {
                 safeSendErrorResponse(res, 500, '실행 에러 처리 중 오류가 발생했습니다.');
             }
@@ -202,13 +229,17 @@ export async function executeDockerProcess(
             controller.abort();
             dockerProcess.kill('SIGTERM');
 
-            const killTimeoutId = setTimeout(() => {
+            const killTimeoutId = setTimeout(async () => {
                 if (dockerProcess && !dockerProcess.killed) {
                     try {
                         dockerProcess.kill('SIGKILL');
                     } catch (killError) {
                         console.error('[ERROR] Failed to kill Docker process:', killError);
                     }
+                }
+                try {
+                    await execAsync(`docker rm -f ${containerName} 2>/dev/null || true`);
+                } catch {
                 }
             }, CONFIG.SIGKILL_DELAY_MS);
 

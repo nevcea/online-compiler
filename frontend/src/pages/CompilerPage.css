@@ -384,11 +384,20 @@
 }
 
 .run-button:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
     background: var(--accent-primary);
     border-color: var(--accent-primary);
     color: #ffffff;
+    transform: none;
+    box-shadow: none;
+}
+
+.run-button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
 }
 
 .run-button svg,

@@ -58,7 +58,7 @@ export function buildDockerArgs(
     hostCodePath: string,
     opts: BuildOptions = {},
     kotlinCacheDir?: string
-): string[] {
+): { args: string[]; containerName: string } {
     if (!validateLanguage(language)) {
         throw new Error('Invalid language');
     }
@@ -94,8 +94,11 @@ export function buildDockerArgs(
         throw new Error('Invalid container path format');
     }
 
+    const containerName = `compiler-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     const args: string[] = [
-        'run', '--rm',
+        'run',
+        '--name', containerName,
         `--memory=${CONFIG.MAX_MEMORY}`,
         `--cpus=${language === 'kotlin' ? CONFIG.MAX_CPU_PERCENT_KOTLIN : CPU_LIMITS[language] || CONFIG.MAX_CPU_PERCENT}`
     ];
@@ -154,6 +157,6 @@ export function buildDockerArgs(
     const fileCopyCommand = buildFileCopyCommand(mountedFilePath, containerPath, !!opts.inputPath, inputBasename);
     args.push(config.image, 'sh', '-c', `${fileCopyCommand}${command}`);
 
-    return args;
+    return { args, containerName };
 }
 

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Output } from '../types';
 import Modal from './Modal';
@@ -14,6 +14,8 @@ interface OutputPanelProps {
 const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) => {
     const { t, setOutput, executionTime, isRunning } = useApp();
     const [pendingClearOutput, setPendingClearOutput] = useState(false);
+    const outputContentRef = useRef<HTMLDivElement>(null);
+    const consoleOutputRef = useRef<HTMLDivElement>(null);
 
     const handleClear = () => {
         setPendingClearOutput(true);
@@ -32,6 +34,19 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
     const images = typeof output === 'object' && 'images' in output ? output.images : [];
     const hasContent = outputText || error || images.length > 0;
 
+    // 실행 완료 후 자동 스크롤
+    useEffect(() => {
+        if (!isRunning && hasContent && consoleOutputRef.current) {
+            const timer = setTimeout(() => {
+                consoleOutputRef.current?.scrollTo({
+                    top: consoleOutputRef.current.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isRunning, hasContent, outputText, error, images.length]);
+
     return (
         <div className="output-section">
             <div className="output-header">
@@ -39,7 +54,11 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
                     <div className="output-title-content">
                         {t('execution-result')}
                         {executionTime !== null && !isRunning && (
-                            <span className="execution-time">
+                            <span className="execution-time" title={t('execution-time')}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.25rem' }}>
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
                                 {(executionTime / 1000).toFixed(3)}{t('seconds')}
                             </span>
                         )}
@@ -49,6 +68,7 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
                     <button
                         className="clear-output-btn"
                         onClick={handleClear}
+                        aria-label={t('clear-output')}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -59,7 +79,7 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
                     </button>
                 )}
             </div>
-            <div id="output" className="output-content">
+            <div id="output" className="output-content" ref={outputContentRef}>
                 {isRunning ? (
                     <div className="output-loading">
                         <svg className="animate-spin loading-spinner" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,7 +96,7 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
                         <p className="empty-text">{t('output-placeholder')}</p>
                     </div>
                 ) : (
-                    <div className="console-output">
+                    <div className="console-output" ref={consoleOutputRef}>
                         {images.length > 0 && (
                             <div style={{ marginBottom: '0.75rem' }}>
                                 {images.map((img, index) => (
@@ -114,6 +134,7 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
                         onChange={(e) => setInput(e.target.value)}
                         autoComplete="off"
                         disabled={isRunning}
+                        aria-label={t('console-input-placeholder') || '프로그램 입력'}
                     />
                 </div>
             </div>

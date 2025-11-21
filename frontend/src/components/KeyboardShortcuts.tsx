@@ -11,11 +11,15 @@ const KeyboardShortcuts = () => {
                 e.preventDefault();
                 setShowModal(true);
             }
+            if (e.key === 'Escape' && showModal) {
+                e.preventDefault();
+                setShowModal(false);
+            }
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [showModal]);
 
     const shortcuts = [
         { keys: ['Ctrl', 'Enter'], description: t('shortcut-run-code') || 'Run code' },

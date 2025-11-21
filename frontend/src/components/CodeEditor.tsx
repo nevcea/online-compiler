@@ -29,7 +29,7 @@ interface CodeEditorProps {
 }
 
 const CodeEditor = memo(({ onRun }: CodeEditorProps) => {
-    const { code, setCode, currentLanguage, theme, fontFamily, fontSize } = useApp();
+    const { code, setCode, currentLanguage, theme, fontFamily, fontSize, t } = useApp();
     const editorRef = useRef<AceEditor>(null);
 
     const getSystemTheme = (): 'dark' | 'light' => {
@@ -96,7 +96,7 @@ const CodeEditor = memo(({ onRun }: CodeEditorProps) => {
                     }}
                 >
                     <div className="text-center px-4">
-                        <p className="text-sm text-muted-foreground">코드를 입력하세요</p>
+                        <p className="text-sm text-muted-foreground">{t('code-placeholder') || '코드를 입력하세요'}</p>
                     </div>
                 </div>
             ) : null}
@@ -118,6 +118,7 @@ const CodeEditor = memo(({ onRun }: CodeEditorProps) => {
                     fontFamily: fontFamily
                 }}
                 className="ace-editor-wrapper"
+                aria-label={t('code-editor')}
                 setOptions={{
                     showLineNumbers: true,
                     tabSize: 4,

@@ -78,7 +78,8 @@ export const translations: Record<Language, Record<string, string>> = {
         'docker-permission-error': 'Docker 권한 오류가 발생했습니다. Docker 권한을 확인해주세요.',
         'docker-invalid-format': 'Docker 명령어 형식 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
         'execution-timeout': '실행 시간이 초과되었습니다.',
-        'execution-error': '실행 중 오류가 발생했습니다.'
+        'execution-error': '실행 중 오류가 발생했습니다.',
+        'code-placeholder': '코드를 입력하세요'
     },
     en: {
         title: 'Online Compiler',
@@ -158,7 +159,8 @@ export const translations: Record<Language, Record<string, string>> = {
         'docker-permission-error': 'Docker permission error occurred. Please check Docker permissions.',
         'docker-invalid-format': 'Docker command format error occurred. Please try again in a moment.',
         'execution-timeout': 'Execution timeout exceeded.',
-        'execution-error': 'An error occurred during execution.'
+        'execution-error': 'An error occurred during execution.',
+        'code-placeholder': 'Enter your code here'
     }
 };
 
