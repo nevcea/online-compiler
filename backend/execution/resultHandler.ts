@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { ExecutionError, ImageFile } from '../types';
 import { filterDockerMessages, sanitizeError, sanitizeErrorForUser } from '../utils/errorHandling';
 import { findImageFiles } from '../file/fileManager';
+import { executionCache } from '../utils/cache';
 
 export async function handleExecutionResult(
     error: ExecutionError | Error | null,
@@ -10,7 +11,8 @@ export async function handleExecutionResult(
     stderr: string,
     executionTime: number,
     res: Response,
-    outputDir: string | null = null
+    outputDir: string | null = null,
+    cacheKey?: { code: string; language: string; input: string }
 ): Promise<void> {
     const filteredStdout = filterDockerMessages(stdout || '');
     const filteredStderr = filterDockerMessages(stderr || '');
@@ -45,12 +47,23 @@ export async function handleExecutionResult(
             errorMsg = sanitizeErrorForUser(sanitized);
         }
 
-        res.json({
+        const result = {
             output: filteredStdout || '',
             error: errorMsg,
             executionTime,
-            images
-        });
+            images: images.map(img => img.data)
+        };
+
+        if (cacheKey) {
+            executionCache.set(cacheKey.code, cacheKey.language, cacheKey.input, {
+                output: result.output,
+                error: result.error,
+                executionTime: result.executionTime,
+                images: result.images
+            });
+        }
+
+        res.json(result);
         return;
     }
 
@@ -75,11 +88,22 @@ export async function handleExecutionResult(
         finalError = filteredStderr ? sanitizeErrorForUser(filteredStderr) : '';
     }
 
-    res.json({
+    const result = {
         output: finalOutput,
         error: finalError,
         executionTime,
-        images
-    });
+        images: images.map(img => img.data)
+    };
+
+    if (cacheKey) {
+        executionCache.set(cacheKey.code, cacheKey.language, cacheKey.input, {
+            output: result.output,
+            error: result.error,
+            executionTime: result.executionTime,
+            images: result.images
+        });
+    }
+
+    res.json(result);
 }
 

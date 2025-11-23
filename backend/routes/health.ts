@@ -1,14 +1,25 @@
 import { Request, Response } from 'express';
 import { executionQueue } from '../execution/executionQueue';
 import { getResourceStats, formatBytes, formatUptime } from '../utils/resourceMonitor';
+import { executionCache } from '../utils/cache';
 
 export async function healthRoute(_: Request, res: Response): Promise<void> {
     const queueStatus = executionQueue.getStatus();
     const resourceStats = await getResourceStats();
+    const cacheStats = executionCache.getStats();
 
     const response: any = {
         status: 'ok',
         queue: queueStatus,
+        cache: {
+            enabled: true,
+            hits: cacheStats.hits,
+            misses: cacheStats.misses,
+            hitRate: `${(cacheStats.hitRate * 100).toFixed(2)}%`,
+            size: cacheStats.size,
+            evictions: cacheStats.evictions,
+            totalRequests: cacheStats.totalRequests
+        },
         resources: {
             memory: {
                 used: formatBytes(resourceStats.memory.used),

@@ -71,6 +71,9 @@ Key environment variables (optional, defaults available):
 - `MAX_OUTPUT_BYTES`: Maximum output size (default: 1MB)
 - `ENABLE_PRELOAD`: Pre-pull Docker images (default: `true`)
 - `ENABLE_WARMUP`: Container warmup (default: `true`)
+- `ENABLE_CACHE`: Enable execution result caching (default: `true`)
+- `CACHE_MAX_SIZE`: Maximum number of cached results (default: 1000)
+- `CACHE_TTL_MS`: Cache time-to-live in milliseconds (default: 1 hour)
 
 ---
 

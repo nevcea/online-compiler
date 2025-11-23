@@ -12,6 +12,7 @@ import { createExecuteRoute } from './routes/execute';
 import { healthRoute } from './routes/health';
 import { createCleanupScheduler } from './utils/cleanupScheduler';
 import { setResourceMonitorPaths } from './utils/resourceMonitor';
+import { executionCache } from './utils/cache';
 
 const app = express();
 
@@ -158,11 +159,13 @@ ensureDirectories(codeDir, outputDir, toolCacheDir, kotlinCacheDir, kotlinBuilds
         process.on('SIGTERM', () => {
             console.log('[SERVER] SIGTERM received, stopping cleanup scheduler...');
             cleanupScheduler.stop();
+            executionCache.stop();
         });
 
         process.on('SIGINT', () => {
             console.log('[SERVER] SIGINT received, stopping cleanup scheduler...');
             cleanupScheduler.stop();
+            executionCache.stop();
         });
 
         startHttpServer();

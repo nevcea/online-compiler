@@ -53,7 +53,8 @@ export async function executeDockerProcess(
     res: Response,
     sessionOutputDir: string,
     fullInputPath: string | null,
-    kotlinCacheDir?: string
+    kotlinCacheDir?: string,
+    cacheKey?: { code: string; language: string; input: string }
 ): Promise<void> {
     const { args: dockerArgs, containerName } = buildDockerArgs(language, fullCodePath, buildOptions, kotlinCacheDir);
 
@@ -137,7 +138,8 @@ export async function executeDockerProcess(
                 stderr,
                 executionTime,
                 res,
-                sessionOutputDir
+                sessionOutputDir,
+                cacheKey
             );
         } catch (err) {
             console.error('[ERROR] Error in handleClose:', err);
@@ -196,7 +198,8 @@ export async function executeDockerProcess(
                 combinedStderr,
                 executionTime,
                 res,
-                sessionOutputDir
+                sessionOutputDir,
+                cacheKey
             );
         } catch (err) {
             console.error('[ERROR] Error in handleError:', err);

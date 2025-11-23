@@ -40,7 +40,7 @@ export const executeCode = async (
         return await response.json();
     } catch (error) {
         clearTimeout(timeoutId);
-        
+
         if (error instanceof Error) {
             if (error.name === 'AbortError') {
                 throw new Error('Request timeout: The request took too long to complete.');

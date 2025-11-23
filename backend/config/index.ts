@@ -51,6 +51,7 @@ export interface Config {
     ENABLE_CLEANUP: boolean;
     CLEANUP_INTERVAL_MS: number;
     SESSION_MAX_AGE_MS: number;
+    ENABLE_CACHE: boolean;
 }
 
 export const CONFIG: Config = {
@@ -92,7 +93,8 @@ export const CONFIG: Config = {
     ERROR_MESSAGE_MAX_LENGTH: parseIntegerEnv(process.env.ERROR_MESSAGE_MAX_LENGTH, 200, 50, 10000),
     ENABLE_CLEANUP: parseBooleanEnv(process.env.ENABLE_CLEANUP, true),
     CLEANUP_INTERVAL_MS: parseIntegerEnv(process.env.CLEANUP_INTERVAL_MS, 60 * 60 * 1000, 5 * 60 * 1000, 24 * 60 * 60 * 1000),
-    SESSION_MAX_AGE_MS: parseIntegerEnv(process.env.SESSION_MAX_AGE_MS, 24 * 60 * 60 * 1000, 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000)
+    SESSION_MAX_AGE_MS: parseIntegerEnv(process.env.SESSION_MAX_AGE_MS, 24 * 60 * 60 * 1000, 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000),
+    ENABLE_CACHE: parseBooleanEnv(process.env.ENABLE_CACHE, true)
 };
 
 export function validateConfig(): void {

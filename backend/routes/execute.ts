@@ -12,6 +12,7 @@ import { executeDockerProcess } from '../execution/executor';
 import { warmupKotlinOnStart } from '../docker/dockerWarmup';
 import { kotlinCompilerExistsOnHost } from '../utils/pathUtils';
 import { executionQueue } from '../execution/executionQueue';
+import { executionCache } from '../utils/cache';
 
 function validateCodePath(filePath: unknown, codeDir: string): boolean {
     const normalized = normalizePath(filePath);
@@ -62,6 +63,21 @@ export function createExecuteRoute(
         }
         if (inputText.length > CONFIG.MAX_INPUT_LENGTH) {
             safeSendErrorResponse(res, 400, `입력 길이가 최대 ${CONFIG.MAX_INPUT_LENGTH}자를 초과했습니다.`);
+            return;
+        }
+
+        const cachedResult = executionCache.get(code, language, inputText);
+        if (cachedResult) {
+            if (CONFIG.DEBUG_MODE) {
+                console.log('[CACHE] Cache hit for code execution');
+            }
+            res.json({
+                output: cachedResult.output,
+                error: cachedResult.error,
+                executionTime: cachedResult.executionTime,
+                images: cachedResult.images,
+                cached: true
+            });
             return;
         }
 
@@ -165,6 +181,7 @@ export function createExecuteRoute(
             }
 
             const executionId = `${sessionId}_${language}_${Date.now()}`;
+            const cacheKey = { code, language, input: inputText };
             await executionQueue.enqueue(
                 executionId,
                 language,
@@ -178,7 +195,8 @@ export function createExecuteRoute(
                         res,
                         sessionOutputDir,
                         fullInputPath,
-                        kotlinCacheDir
+                        kotlinCacheDir,
+                        cacheKey
                     );
                 },
                 0
