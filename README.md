@@ -18,10 +18,20 @@ The frontend is a React + Vite-based single-page application, and the backend is
 
 ### Quick Start
 
-1. Run `npm install` in the root directory
-2. Run `cd frontend && npm install`, then `cd ../backend && npm install`
-3. Run `npm run dev` in the root directory
-4. Open `http://localhost:5173` in your browser, write code, then press **Ctrl+Enter** to execute
+1. Ensure Docker Desktop is running
+2. Install dependencies:
+   ```bash
+   npm install                    # Root dependencies
+   cd frontend && npm install     # Frontend dependencies
+   cd ../backend && npm install  # Backend dependencies
+   cd ..                          # Return to root
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open `http://localhost:5173` in your browser
+5. Write code and press **Ctrl+Enter** to execute
 
 ---
 
@@ -31,86 +41,23 @@ The frontend is a React + Vite-based single-page application, and the backend is
   - React 19, TypeScript
   - Vite
   - Ace Editor (`react-ace`, `ace-builds`)
-  - Tailwind CSS + custom CSS
+  - Tailwind CSS
 - **Backend**
   - Node.js (TypeScript)
   - Express 5, CORS, Helmet, express-rate-limit
-  - Docker CLI integration (`docker run`, `docker images`, `docker pull`, etc.)
+  - Docker CLI integration
   - Jest (testing framework)
-- **Infrastructure/Execution**
+- **Infrastructure**
   - Docker / Docker Desktop
-  - Docker Compose (backend container execution and network management)
+  - Docker Compose
 
 ---
 
-## Directory Structure Overview
+## Prerequisites
 
-- `backend/`: Express server, Docker execution logic, code validation
-  - `server.ts`: Server entry point
-  - `routes/`: API endpoints (`/api/execute`, `/api/health`)
-  - `config/`: Language-specific settings and resource limits
-  - `docker/`: Docker image management and warmup
-  - `execution/`: Code execution and result processing
-- `frontend/`: React-based UI
-  - `src/pages/`: Compiler page, settings page
-  - `src/components/`: UI components
-  - `src/services/`: API calls
-
----
-
-## Installation and Execution
-
-### 1. Prerequisites
-
-- Node.js (LTS version recommended)
+- Node.js 20+ (LTS recommended)
 - npm or pnpm
-- Docker and Docker Compose
-  - **Docker Desktop** must be running for local execution (Windows/macOS)
-  - The backend container uses the host's Docker daemon (`docker.sock`) to launch additional containers for language-specific execution.
-
-### 2. Install Dependencies
-
-Install required packages in the root, frontend, and backend directories.
-
-```bash
-# Install dev dependencies for root scripts
-npm install
-
-# Frontend
-cd frontend
-npm install
-
-# Backend
-cd ../backend
-npm install
-```
-
-### 3. Run Development Server (Local Development)
-
-It's convenient to use the scripts defined in the root `package.json`.
-
-```bash
-# Run from root
-npm run dev         # Run frontend + backend simultaneously (scripts/dev.cjs)
-
-# Or run individually
-npm run dev:frontend
-npm run dev:backend
-```
-
-- Frontend: Default `http://localhost:5173`
-- Backend: Default `http://localhost:4000`
-  - The frontend Vite dev server proxies `/api` paths to the backend.  
-    (See `frontend/vite.config.ts`)
-
-### 4. Run in Docker Environment
-
-```bash
-npm run docker:build
-npm run docker:up
-npm run docker:logs
-npm run docker:down
-```
+- Docker Desktop (must be running)
 
 ---
 
@@ -133,41 +80,47 @@ Key environment variables (optional, defaults available):
 
 Code execution request
 
-- **Request**: `{ code: string, language: string, input?: string }`
-- **Response**: `{ output?: string, error?: string, executionTime: number, images?: Array }`
+- **Request Body**:
+  ```json
+  {
+    "code": "string",
+    "language": "string",
+    "input": "string (optional)"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "output": "string (optional)",
+    "error": "string (optional)",
+    "executionTime": "number (milliseconds)",
+    "images": "Array<string> (optional, base64 encoded images for R language)"
+  }
+  ```
 
 ### `GET /api/health`
 
-Server status check
-
----
-
-## Code Execution Flow
-
-1. Frontend sends code execution request to `/api/execute`
-2. Backend validates code and executes Docker container
-3. Execution results (output/error/images) are returned to frontend
+Server health check
 
 ---
 
 ## Security and Limitations
 
 - Docker container isolation (network blocking, read-only file system)
-- Dangerous pattern validation and resource limits (CPU, memory, execution time, output size)
-- Rate limiting to prevent API abuse
+- Resource limits (CPU, memory, execution time, output size)
+- Code validation and dangerous pattern detection
+- Rate limiting and security headers (Helmet.js)
 
 ---
 
 ## Development Scripts
 
-**Root**
-- `npm run dev`: Run frontend/backend simultaneously
+- `npm run dev`: Run frontend + backend
 - `npm run test`: Run tests
 - `npm run lint`: Code linting
-- `npm run docker:build`, `docker:up`, `docker:down`: Docker management
-
-**Backend/Frontend**
-- Each directory supports `npm run dev`, `npm run build`, `npm test`, etc.
+- `npm run docker:build`: Build Docker containers
+- `npm run docker:up`: Start containers
+- `npm run docker:down`: Stop containers
 
 ---
 
