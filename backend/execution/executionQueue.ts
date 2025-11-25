@@ -1,3 +1,8 @@
+import { CONFIG } from '../config';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ExecutionQueue');
+
 interface QueuedExecution {
     id: string;
     language: string;
@@ -26,10 +31,12 @@ export class ExecutionQueue {
         priority: number = 0
     ): Promise<void> {
         if (this.queue.length >= this.maxQueueSize) {
+            logger.warn('Queue full', { queueSize: this.queue.length, maxQueueSize: this.maxQueueSize });
             throw new Error('Execution queue is full. Please try again later.');
         }
 
         if (this.running.has(id)) {
+            logger.warn('Duplicate execution ID', { id });
             throw new Error('Execution already in progress');
         }
 
@@ -52,6 +59,7 @@ export class ExecutionQueue {
                 return a.timestamp - b.timestamp;
             });
 
+            logger.debug('Enqueued', { id, language, queueSize: this.queue.length });
             this.processQueue();
         });
     }
@@ -71,15 +79,18 @@ export class ExecutionQueue {
         }
 
         this.running.add(next.id);
+        logger.debug('Starting execution', { id: next.id, runningCount: this.running.size });
 
         next.execute()
             .then(() => {
                 this.running.delete(next.id);
+                logger.debug('Execution completed', { id: next.id });
                 next.resolve();
                 this.processQueue();
             })
             .catch((error: Error) => {
                 this.running.delete(next.id);
+                logger.error('Execution failed', { id: next.id, error });
                 next.reject(error);
                 this.processQueue();
             });
@@ -94,7 +105,14 @@ export class ExecutionQueue {
     }
 
     getRunningCountByLanguage(language: string): number {
-        return Array.from(this.running).filter(id => id.includes(`_${language}_`)).length;
+        const searchStr = `_${language}_`;
+        let count = 0;
+        for (const id of this.running) {
+            if (id.includes(searchStr)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     getStatus(): {
@@ -114,20 +132,11 @@ export class ExecutionQueue {
     clear(): void {
         this.queue = [];
         this.running.clear();
+        logger.info('Queue cleared');
     }
 }
 
-import { parseIntegerEnv } from '../utils/envValidation';
-
-const DEFAULT_MAX_CONCURRENT = 5;
-const DEFAULT_MAX_QUEUE_SIZE = 50;
-const MAX_CONCURRENT_MIN = 1;
-const MAX_CONCURRENT_MAX = 50;
-const MAX_QUEUE_SIZE_MIN = 10;
-const MAX_QUEUE_SIZE_MAX = 500;
-
 export const executionQueue = new ExecutionQueue(
-    parseIntegerEnv(process.env.MAX_CONCURRENT_EXECUTIONS, DEFAULT_MAX_CONCURRENT, MAX_CONCURRENT_MIN, MAX_CONCURRENT_MAX),
-    parseIntegerEnv(process.env.MAX_QUEUE_SIZE, DEFAULT_MAX_QUEUE_SIZE, MAX_QUEUE_SIZE_MIN, MAX_QUEUE_SIZE_MAX)
+    CONFIG.MAX_CONCURRENT_EXECUTIONS,
+    CONFIG.MAX_QUEUE_SIZE
 );
-

@@ -2,12 +2,15 @@ import path from 'path';
 import { CONFIG } from '../config';
 import { BuildOptions } from '../types';
 import { convertToDockerPath, validateDockerPath } from '../utils/pathUtils';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('VolumeMounts');
 
 function validateAndConvertPath(hostPath: string, pathName: string): string {
     const dockerPath = convertToDockerPath(hostPath);
     if (!validateDockerPath(dockerPath)) {
         const error = new Error(`Invalid Docker ${pathName} path: ${dockerPath}`);
-        console.error(`[ERROR] Invalid ${pathName}: "${dockerPath}" from hostPath: "${hostPath}"`);
+        logger.error(`Invalid ${pathName}`, { dockerPath, hostPath });
         throw error;
     }
     return dockerPath;
@@ -37,18 +40,20 @@ export function buildVolumeMounts(
         const hostFileName = path.basename(hostCodePath);
         const dockerHostDir = validateAndConvertPath(hostCodeDir, 'host directory');
         const mountedFilePath = `/code/${hostFileName}`;
-        console.log(
-            `[DEBUG] File paths: hostCodePath=${hostCodePath}, hostCodeDir=${hostCodeDir}, hostFileName=${hostFileName}, dockerHostDir=${dockerHostDir}, mountedFilePath=${mountedFilePath}`
-        );
+        logger.debug('File paths', {
+            hostCodePath,
+            hostCodeDir,
+            hostFileName,
+            dockerHostDir,
+            mountedFilePath
+        });
     }
 
     addVolumeMount(volumeMounts, hostCodeDir, '/code', 'code directory', 'ro');
 
     if (opts.inputPath) {
         const hostInputDir = path.dirname(opts.inputPath);
-        if (CONFIG.DEBUG_MODE) {
-            console.log(`[DEBUG] Input file paths: hostInputPath=${opts.inputPath}, hostInputDir=${hostInputDir}`);
-        }
+        logger.debug('Input file paths', { hostInputPath: opts.inputPath, hostInputDir });
         addVolumeMount(volumeMounts, hostInputDir, '/input', 'input directory', 'ro');
     }
 
@@ -62,4 +67,3 @@ export function buildVolumeMounts(
 
     return volumeMounts;
 }
-

@@ -8,8 +8,12 @@ services:
             - '${BACKEND_PORT:-3000}:3000'
         volumes:
             - ./backend/code:/app/code
+            - ./backend/code:/app/dist/code
             - ./backend/output:/app/output
+            - ./backend/output:/app/dist/output
+            - ./backend/tool_cache:/app/dist/tool_cache
             - /var/run/docker.sock:/var/run/docker.sock
+        user: "0:0"
         environment:
             - PORT=${PORT:-3000}
             - NODE_ENV=${NODE_ENV:-production}
@@ -18,7 +22,7 @@ services:
             - ENABLE_PRELOAD=${ENABLE_PRELOAD:-true}
             - ENABLE_WARMUP=${ENABLE_WARMUP:-true}
             - TRUST_PROXY=${TRUST_PROXY:-false}
-            - DEBUG=${DEBUG:-false}
+            - DEBUG=${DEBUG:-true}
         env_file:
             - .env
         restart: unless-stopped

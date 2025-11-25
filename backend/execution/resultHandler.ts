@@ -5,7 +5,39 @@ import { filterDockerMessages, sanitizeError, sanitizeErrorForUser } from '../ut
 import { findImageFiles } from '../file/fileManager';
 import { executionCache } from '../utils/cache';
 import { codeExecutionTotal, codeExecutionDuration, codeExecutionErrors } from '../utils/metrics';
-import { CONFIG } from '../config';
+import { createLogger } from '../utils/logger';
+import { ERROR_MESSAGES } from '../utils/constants';
+
+const logger = createLogger('ResultHandler');
+
+function isTimeoutError(error: ExecutionError | Error): boolean {
+    return ('killed' in error && error.killed) || ('signal' in error && error.signal === 'SIGTERM');
+}
+
+function createResultObject(output: string, error: string, executionTime: number, images: ImageFile[]): any {
+    return {
+        output: output || '',
+        error,
+        executionTime,
+        images: images.map(img => img.data)
+    };
+}
+
+function cacheAndSendResult(
+    result: any,
+    res: Response,
+    cacheKey?: { code: string; language: string; input: string }
+): void {
+    if (cacheKey) {
+        executionCache.set(cacheKey.code, cacheKey.language, cacheKey.input, {
+            output: result.output,
+            error: result.error,
+            executionTime: result.executionTime,
+            images: result.images
+        });
+    }
+    res.json(result);
+}
 
 export async function handleExecutionResult(
     error: ExecutionError | Error | null,
@@ -26,102 +58,83 @@ export async function handleExecutionResult(
         try {
             images = await findImageFiles(outputDir);
         } catch (error) {
-            console.error('[ERROR] Failed to find image files:', error);
+            logger.error('Failed to find image files:', error);
         }
         fs.rm(outputDir, { recursive: true, force: true }).catch((error) => {
-            if (CONFIG.DEBUG_MODE) {
-                console.error('[ERROR] Failed to cleanup output directory:', error);
-            }
+            logger.debug('Failed to cleanup output directory:', error);
         });
     }
 
-    if (language) {
+    // Use language from parameter or fallback to cacheKey
+    const finalLanguage = language || cacheKey?.language;
+
+    logger.debug('[METRICS] Recording metrics:', {
+        languageParam: language,
+        cacheKeyLanguage: cacheKey?.language,
+        finalLanguage,
+        hasError: !!error,
+        executionTimeMs: executionTime
+    });
+
+    if (finalLanguage) {
         const executionTimeSeconds = executionTime / 1000;
-        codeExecutionDuration.observe({ language }, executionTimeSeconds);
+        codeExecutionDuration.observe({ language: finalLanguage }, executionTimeSeconds);
 
         if (error) {
             const errorType = ('killed' in error && error.killed) || ('signal' in error && error.signal === 'SIGTERM')
                 ? 'timeout'
                 : 'execution_error';
-            codeExecutionErrors.inc({ language, error_type: errorType });
-            codeExecutionTotal.inc({ language, status: 'error' });
+            codeExecutionErrors.inc({ language: finalLanguage, error_type: errorType });
+            codeExecutionTotal.inc({ language: finalLanguage, status: 'error' });
+            logger.debug(`[METRICS] Recorded error metrics: language=${finalLanguage}, error_type=${errorType}`);
         } else {
-            codeExecutionTotal.inc({ language, status: 'success' });
+            codeExecutionTotal.inc({ language: finalLanguage, status: 'success' });
+            logger.debug(`[METRICS] Recorded success metrics: language=${finalLanguage}, duration=${executionTimeSeconds}s`);
         }
-    }
-
-    if (error) {
-        let errorMsg: string;
-        if ('killed' in error && error.killed || 'signal' in error && error.signal === 'SIGTERM') {
-            errorMsg = '실행 시간이 초과되었습니다.';
-        } else {
-            let errorSource: string;
-            if ('message' in error && error.message && error.message !== 'Docker error') {
-                errorSource = error.message;
-            } else {
-                errorSource = stderr || ('message' in error ? error.message || 'Unknown error' : 'Unknown error');
-            }
-            const sanitized = sanitizeError(errorSource);
-            errorMsg = sanitizeErrorForUser(sanitized);
-        }
-
-        const result = {
-            output: filteredStdout || '',
-            error: errorMsg,
-            executionTime,
-            images: images.map(img => img.data)
-        };
-
-        if (cacheKey) {
-            executionCache.set(cacheKey.code, cacheKey.language, cacheKey.input, {
-                output: result.output,
-                error: result.error,
-                executionTime: result.executionTime,
-                images: result.images
-            });
-        }
-
-        res.json(result);
-        return;
-    }
-
-    let finalOutput = hasStdout ? filteredStdout : '';
-    let finalError = '';
-
-    if (!hasStdout && filteredStderr) {
-        const isBuildSuccess = /Build succeeded/i.test(filteredStderr);
-        const isBuildFailed = /Build FAILED/i.test(filteredStderr);
-        const isWarningOnly =
-            /warning/i.test(filteredStderr) && !/error/i.test(filteredStderr) && !isBuildFailed;
-
-        if (isBuildSuccess || isWarningOnly) {
-            finalOutput = '';
-            finalError = '';
-        } else {
-            finalError = sanitizeErrorForUser(filteredStderr);
-        }
-    } else if (hasStdout) {
-        finalError = '';
     } else {
-        finalError = filteredStderr ? sanitizeErrorForUser(filteredStderr) : '';
-    }
-
-    const result = {
-        output: finalOutput,
-        error: finalError,
-        executionTime,
-        images: images.map(img => img.data)
-    };
-
-    if (cacheKey) {
-        executionCache.set(cacheKey.code, cacheKey.language, cacheKey.input, {
-            output: result.output,
-            error: result.error,
-            executionTime: result.executionTime,
-            images: result.images
+        logger.warn('[METRICS] Language not available for metrics recording', {
+            languageParam: language,
+            cacheKeyLanguage: cacheKey?.language,
+            cacheKeyExists: !!cacheKey
         });
     }
 
-    res.json(result);
+    if (error) {
+        const errorMsg = isTimeoutError(error)
+            ? ERROR_MESSAGES.EXECUTION_TIMEOUT
+            : (() => {
+                const errorSource = ('message' in error && error.message && error.message !== 'Docker error')
+                    ? error.message
+                    : stderr || ('message' in error ? error.message || 'Unknown error' : 'Unknown error');
+                return sanitizeErrorForUser(sanitizeError(errorSource));
+            })();
+
+        const result = createResultObject(filteredStdout, errorMsg, executionTime, images);
+        cacheAndSendResult(result, res, cacheKey);
+        return;
+    }
+
+    const { finalOutput, finalError } = (() => {
+        if (hasStdout) {
+            return { finalOutput: filteredStdout, finalError: '' };
+        }
+
+        if (filteredStderr) {
+            const isBuildSuccess = /Build succeeded/i.test(filteredStderr);
+            const isBuildFailed = /Build FAILED/i.test(filteredStderr);
+            const isWarningOnly =
+                /warning/i.test(filteredStderr) && !/error/i.test(filteredStderr) && !isBuildFailed;
+
+            if (isBuildSuccess || isWarningOnly) {
+                return { finalOutput: '', finalError: '' };
+            }
+            return { finalOutput: '', finalError: sanitizeErrorForUser(filteredStderr) };
+        }
+
+        return { finalOutput: '', finalError: '' };
+    })();
+
+    const result = createResultObject(finalOutput, finalError, executionTime, images);
+    cacheAndSendResult(result, res, cacheKey);
 }
 

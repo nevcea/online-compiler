@@ -43,7 +43,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && (getent group docker || groupadd -r docker) \
+    && usermod -aG docker appuser || true
 
 WORKDIR /app
 

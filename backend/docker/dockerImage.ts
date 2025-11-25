@@ -4,7 +4,9 @@ import { CONFIG, LANGUAGE_CONFIGS } from '../config';
 import { ImageCacheEntry, PullResult } from '../types';
 import { validateImage } from '../utils/validation';
 import { createTimeoutController } from '../utils/timeout';
+import { createLogger } from '../utils/logger';
 
+const logger = createLogger('DockerImage');
 const imageExistenceCache = new Map<string, ImageCacheEntry>();
 const IMAGE_CACHE_TTL = 10 * 60 * 1000;
 const imageCheckPromises = new Map<string, Promise<boolean>>();
@@ -88,7 +90,7 @@ export async function pullDockerImage(image: string, retries: number = CONFIG.DO
             if (attempt < retries) {
                 const delay = CONFIG.DOCKER_PULL_RETRY_DELAY_BASE * (attempt + 1);
                 if (!silent) {
-                    console.log(`[${image}] Pull failed, retrying... (${attempt + 1}/${retries})`);
+                    logger.info(`[${image}] Pull failed, retrying... (${attempt + 1}/${retries})`);
                 }
                 await new Promise((resolve) => setTimeout(resolve, delay));
             } else {
@@ -104,21 +106,17 @@ export async function preloadDockerImages(): Promise<void> {
     const { isDockerAvailable } = await import('./dockerClient');
 
     if (!(await isDockerAvailable())) {
-        console.warn(
-            '[PRELOAD] Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)'
+        logger.warn(
+            'Docker is not available. Skipping preload. (Start Docker Desktop to auto-pull on first use)'
         );
         return;
     }
-    if (CONFIG.DEBUG_MODE) {
-        console.log('[PRELOAD] Starting Docker images preload...');
-    }
+    logger.debug('Starting Docker images preload...');
     const startTime = Date.now();
     const images = Object.values(LANGUAGE_CONFIGS).map((config) => config.image);
     const uniqueImages = [...new Set(images)];
 
-    if (CONFIG.DEBUG_MODE) {
-        console.log(`[PRELOAD] Checking ${uniqueImages.length} unique images...`);
-    }
+    logger.debug(`Checking ${uniqueImages.length} unique images...`);
 
     const checkPromises = uniqueImages.map(async (image) => {
         const exists = await checkImageExists(image);
@@ -130,20 +128,16 @@ export async function preloadDockerImages(): Promise<void> {
     const existingImages = checkResults.filter(({ exists }) => exists).map(({ image }) => image);
 
     if (imagesToPull.length === 0) {
-        if (CONFIG.DEBUG_MODE) {
-            console.log('[PRELOAD] All required images are already available!');
-        }
+        logger.debug('All required images are already available!');
         return;
     }
 
-    if (CONFIG.DEBUG_MODE) {
-        if (existingImages.length > 0) {
-            console.log(
-                `[PRELOAD] ${existingImages.length} images already exist: ${existingImages.join(', ')}`
-            );
-        }
-        console.log(`[PRELOAD] Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
+    if (existingImages.length > 0) {
+        logger.debug(
+            `${existingImages.length} images already exist: ${existingImages.join(', ')}`
+        );
     }
+    logger.debug(`Pulling ${imagesToPull.length} images: ${imagesToPull.join(', ')}`);
 
     const results: PullResult[] = [];
 
@@ -156,8 +150,8 @@ export async function preloadDockerImages(): Promise<void> {
         const successCount = batchResults.filter((r) => r.success).length;
         const failCount = batchResults.filter((r) => !r.success).length;
         const batchNumber = Math.floor(i / CONFIG.PRELOAD_BATCH_SIZE) + 1;
-        console.log(
-            `[PRELOAD] Batch ${batchNumber}: ${successCount} succeeded, ${failCount} failed`
+        logger.info(
+            `Batch ${batchNumber}: ${successCount} succeeded, ${failCount} failed`
         );
     }
 
@@ -167,12 +161,12 @@ export async function preloadDockerImages(): Promise<void> {
 
     if (totalFailed > 0) {
         const failedImages = results.filter((r) => !r.success).map((r) => r.image);
-        console.warn(`[PRELOAD] Failed to pull ${totalFailed} images: ${failedImages.join(', ')}`);
-        console.warn('[PRELOAD] These images will be pulled on first use.');
+        logger.warn(`Failed to pull ${totalFailed} images: ${failedImages.join(', ')}`);
+        logger.warn('These images will be pulled on first use.');
     }
 
-    console.log(
-        `[PRELOAD] Completed in ${elapsed}s: ${totalSuccess} succeeded, ${totalFailed} failed`
+    logger.info(
+        `Completed in ${elapsed}s: ${totalSuccess} succeeded, ${totalFailed} failed`
     );
 }
 

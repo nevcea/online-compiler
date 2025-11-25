@@ -11,7 +11,9 @@ import { createExecuteRoute } from './routes/execute';
 import { healthRoute } from './routes/health';
 import { metricsRoute } from './routes/metrics';
 import { getServerPaths, initializeServer } from './server/initialization';
+import { createLogger } from './utils/logger';
 
+const logger = createLogger('Server');
 const app = express();
 const paths = getServerPaths();
 
@@ -32,14 +34,14 @@ function setupRequestLogging(app: express.Application): void {
     }
 
     app.use((req: Request, _res: Response, next: NextFunction) => {
-        console.log(`[REQ] ${req.method} ${req.path} Origin=${req.headers.origin || 'n/a'}`);
+        logger.debug(`${req.method} ${req.path} Origin=${req.headers.origin || 'n/a'}`);
         next();
     });
 }
 
 function setupSecurity(app: express.Application, isProduction: boolean): void {
     if (!isProduction) {
-        console.log('[SERVER] Helmet disabled in development');
+        logger.info('Helmet disabled in development');
         return;
     }
 
@@ -108,7 +110,7 @@ function setupErrorHandling(app: express.Application): void {
 
 function startHttpServer(): void {
     app.listen(CONFIG.PORT, () => {
-        console.log(`Server running on port ${CONFIG.PORT}`);
+        logger.info(`Server running on port ${CONFIG.PORT}`);
         if (CONFIG.ENABLE_PRELOAD) {
             preloadDockerImages();
         }
@@ -120,13 +122,13 @@ function startHttpServer(): void {
 }
 
 const isProduction = isProductionEnv();
-console.log(`[SERVER] NODE_ENV=${process.env.NODE_ENV || 'undefined'} isProduction=${isProduction}`);
+logger.info(`NODE_ENV=${process.env.NODE_ENV || 'undefined'} isProduction=${isProduction}`);
 
 try {
     validateConfig();
-    console.log('[SERVER] Configuration validated successfully');
+    logger.info('Configuration validated successfully');
 } catch (error) {
-    console.error('[SERVER] Configuration validation failed:', error);
+    logger.error('Configuration validation failed:', error);
     process.exit(1);
 }
 
@@ -136,10 +138,10 @@ setupErrorHandling(app);
 
 initializeServer(paths)
     .then(() => {
-        console.log('[SERVER] Initialization complete. Starting HTTP server...');
+        logger.info('Initialization complete. Starting HTTP server...');
         startHttpServer();
     })
     .catch((e: unknown) => {
-        console.error('Startup error: initialization failed. Starting server anyway.', e);
+        logger.error('Startup error: initialization failed. Starting server anyway.', e);
         startHttpServer();
     });

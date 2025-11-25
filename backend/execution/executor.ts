@@ -3,23 +3,28 @@ import { promisify } from 'util';
 import { Response } from 'express';
 import { CONFIG, LanguageConfig } from '../config';
 import { BuildOptions, ExecutionError } from '../types';
-import { buildDockerArgs } from '../docker/dockerArgs';
+import { DockerArgs } from '../docker/dockerArgs';
 import { OutputCollector } from './outputCollector';
 import { handleExecutionResult } from './resultHandler';
 import { cleanupFile } from '../file/fileManager';
 import { safeSendErrorResponse } from '../middleware/errorHandler';
 import { validateContainerName, isDockerError, createExecutionError } from './errorHandler';
+import { createLogger } from '../utils/logger';
+import { containerPool } from '../docker/containerPool';
+import { ERROR_MESSAGES } from '../utils/constants';
 
 const execAsync = promisify(exec);
+const logger = createLogger('Executor');
 
 async function cleanupContainer(containerName: string): Promise<void> {
     if (!validateContainerName(containerName)) {
-        console.error('[ERROR] Invalid container name:', containerName);
+        logger.error('Invalid container name', { containerName });
         return;
     }
     try {
         await execAsync(`docker rm -f ${containerName} 2>/dev/null || true`);
     } catch {
+        logger.debug('Container cleanup failed (may already be removed)', { containerName });
     }
 }
 
@@ -35,30 +40,65 @@ export async function executeDockerProcess(
     kotlinCacheDir?: string,
     cacheKey?: { code: string; language: string; input: string }
 ): Promise<void> {
-    const { args: dockerArgs, containerName } = buildDockerArgs(language, fullCodePath, buildOptions, kotlinCacheDir);
+    let pooledContainerId: string | null = null;
+    let dockerProcess: any;
+    let executionArgs: string[] = [];
+    let containerNameForCleanup: string = '';
 
-    if (CONFIG.DEBUG_MODE) {
-        console.log('[EXECUTE] Starting Docker execution', {
-            language,
-            timeout: config.timeout,
-            hasInput: !!fullInputPath
-        });
+    if (CONFIG.ENABLE_CONTAINER_POOL) {
+        try {
+            pooledContainerId = await containerPool.getOrCreateContainer(language, config.image, kotlinCacheDir);
+
+            if (pooledContainerId) {
+                const { command, containerPath, containerInputPath } = DockerArgs.buildExecutionCommand(language, buildOptions, kotlinCacheDir);
+
+                await execAsync(`docker cp "${fullCodePath}" ${pooledContainerId}:"${containerPath}"`);
+
+                if (fullInputPath && containerInputPath) {
+                    await execAsync(`docker cp "${fullInputPath}" ${pooledContainerId}:"${containerInputPath}"`);
+                }
+
+                executionArgs = ['exec', '-u', '1000:1000', pooledContainerId, 'sh', '-c', command];
+                containerNameForCleanup = pooledContainerId;
+                logger.debug('Using pooled container', { pooledContainerId });
+            }
+        } catch (e) {
+            logger.warn('Failed to use pooled container, falling back to standard execution', { error: e });
+            if (pooledContainerId) {
+                containerPool.returnContainer(language, config.image, pooledContainerId).catch(() => {});
+                pooledContainerId = null;
+            }
+        }
     }
 
+    if (!pooledContainerId) {
+        const { args, containerName } = DockerArgs.buildDockerArgs(language, fullCodePath, buildOptions, kotlinCacheDir);
+        executionArgs = args;
+        containerNameForCleanup = containerName;
+    }
+
+    logger.debug('Starting Docker execution', {
+        language,
+        timeout: config.timeout,
+        hasInput: !!fullInputPath,
+        pooled: !!pooledContainerId
+    });
+
     const controller = new AbortController();
-    const abortTimeoutId = setTimeout(
+    let abortTimeoutId: NodeJS.Timeout | null = setTimeout(
         () => controller.abort(),
         config.timeout + CONFIG.TIMEOUT_BUFFER_MS
     );
-    const dockerProcess = spawn('docker', dockerArgs, {
+
+    dockerProcess = spawn('docker', executionArgs, {
         signal: controller.signal
     });
 
     dockerProcess.stdout.setEncoding('utf8');
     dockerProcess.stderr.setEncoding('utf8');
 
-    if (CONFIG.DEBUG_MODE) {
-        console.log('[DEBUG] Container name:', containerName);
+    if (!pooledContainerId) {
+        logger.debug('Container started', { containerName: containerNameForCleanup });
     }
 
     const outputCollector = new OutputCollector(CONFIG.MAX_OUTPUT_BYTES);
@@ -80,6 +120,19 @@ export async function executeDockerProcess(
         return true;
     };
 
+    const performCleanup = async () => {
+        try {
+            if (pooledContainerId) {
+                await containerPool.returnContainer(language, config.image, pooledContainerId);
+            } else {
+                await cleanupContainer(containerNameForCleanup);
+            }
+        } catch (e) {
+            logger.error('Cleanup error', e);
+        }
+        await cleanupResources(fullCodePath, fullInputPath).catch(() => {});
+    };
+
     const handleClose = async (code: number | null): Promise<void> => {
         if (!markResponseHandled()) {
             return;
@@ -89,22 +142,25 @@ export async function executeDockerProcess(
             const { stdout, stderr } = outputCollector.getFinalOutput();
             const executionTime = Date.now() - startTime;
 
-            cleanupContainer(containerName).catch(() => {
+            logger.debug('Process closed', {
+                language,
+                code,
+                executionTime,
+                stdoutLength: stdout.length,
+                stderrLength: stderr.length,
+                stdoutPreview: stdout.substring(0, 500),
+                stderrPreview: stderr.substring(0, 500)
             });
-            cleanupResources(fullCodePath, fullInputPath).catch(() => {
-            });
-
-            if (CONFIG.DEBUG_MODE) {
-                console.log('[EXECUTE] Process closed', {
-                    language,
-                    code,
-                    executionTime
-                });
-            }
 
             const error: ExecutionError | null = code !== 0
                 ? createExecutionError(code, stderr || '')
                 : null;
+
+            logger.debug('Calling handleExecutionResult', {
+                language,
+                hasError: !!error,
+                executionTime
+            });
 
             await handleExecutionResult(
                 error,
@@ -116,11 +172,13 @@ export async function executeDockerProcess(
                 cacheKey,
                 language
             );
+
+            performCleanup().catch(err => logger.error('Cleanup failed after response', err));
         } catch (err) {
-            console.error('[ERROR] Error in handleClose:', err);
-            await cleanupContainer(containerName);
+            logger.error('Error in handleClose', err);
+            await performCleanup();
             if (!res.headersSent) {
-                safeSendErrorResponse(res, 500, '실행 결과 처리 중 오류가 발생했습니다.');
+                safeSendErrorResponse(res, 500, ERROR_MESSAGES.RESULT_PROCESSING_ERROR);
             }
         }
     };
@@ -134,24 +192,23 @@ export async function executeDockerProcess(
             const { stdout, stderr } = outputCollector.getFinalOutput();
             const executionTime = Date.now() - startTime;
 
-            cleanupContainer(containerName).catch(() => {
+            logger.debug('Process error', {
+                language,
+                executionTime,
+                errorMessage: error.message
             });
-            cleanupResources(fullCodePath, fullInputPath).catch(() => {
-            });
-
-            if (CONFIG.DEBUG_MODE) {
-                console.error('[EXECUTE] Process error', {
-                    language,
-                    executionTime,
-                    errorMessage: error.message
-                });
-            }
 
             const errorMessage = error.message || '';
             const combinedStderr = stderr || errorMessage;
             const executionError = errorMessage.includes('ENOENT') || isDockerError(combinedStderr)
                 ? createExecutionError(null, combinedStderr, errorMessage)
                 : createExecutionError(null, combinedStderr);
+
+            logger.debug('Calling handleExecutionResult (error handler)', {
+                language,
+                hasError: !!executionError,
+                executionTime
+            });
 
             await handleExecutionResult(
                 executionError,
@@ -160,13 +217,16 @@ export async function executeDockerProcess(
                 executionTime,
                 res,
                 sessionOutputDir,
-                cacheKey
+                cacheKey,
+                language
             );
+
+            performCleanup().catch(err => logger.error('Cleanup failed after response (error case)', err));
         } catch (err) {
-            console.error('[ERROR] Error in handleError:', err);
-            await cleanupContainer(containerName);
+            logger.error('Error in handleError', err);
+            await performCleanup();
             if (!res.headersSent) {
-                safeSendErrorResponse(res, 500, '실행 에러 처리 중 오류가 발생했습니다.');
+                safeSendErrorResponse(res, 500, ERROR_MESSAGES.EXECUTION_ERROR_HANDLING_ERROR);
             }
         }
     };
@@ -174,7 +234,7 @@ export async function executeDockerProcess(
     dockerProcess.on('close', handleClose);
     dockerProcess.on('error', handleError);
 
-    const processTimeoutId = setTimeout(async () => {
+    let processTimeoutId: NodeJS.Timeout | null = setTimeout(async () => {
         if (responseHandled || res.headersSent) {
             return;
         }
@@ -183,13 +243,10 @@ export async function executeDockerProcess(
         }
 
         try {
-            if (CONFIG.DEBUG_MODE) {
-                console.warn('[EXECUTE] Execution timeout reached', {
-                    language,
-                    timeout: config.timeout,
-                    timeoutBufferMs: CONFIG.TIMEOUT_BUFFER_MS
-                });
-            }
+            logger.warn('Execution timeout reached', {
+                language,
+                timeout: config.timeout
+            });
 
             controller.abort();
             dockerProcess.kill('SIGTERM');
@@ -199,10 +256,14 @@ export async function executeDockerProcess(
                     try {
                         dockerProcess.kill('SIGKILL');
                     } catch (killError) {
-                        console.error('[ERROR] Failed to kill Docker process:', killError);
+                        logger.error('Failed to kill Docker process', killError);
                     }
                 }
-                await cleanupContainer(containerName);
+                if (pooledContainerId) {
+                    await containerPool.returnContainer(language, config.image, pooledContainerId);
+                } else {
+                    await cleanupContainer(containerNameForCleanup);
+                }
             }, CONFIG.SIGKILL_DELAY_MS);
 
             const cleanupKillTimeout = (): void => {
@@ -211,18 +272,23 @@ export async function executeDockerProcess(
             dockerProcess.once('close', cleanupKillTimeout);
             dockerProcess.once('error', cleanupKillTimeout);
         } catch (killError) {
-            console.error('[ERROR] Failed to send SIGTERM to Docker process:', killError);
+            logger.error('Failed to send SIGTERM to Docker process', killError);
             if (!res.headersSent && markResponseHandled()) {
-                await cleanupContainer(containerName);
-                await cleanupResources(fullCodePath, fullInputPath);
-                safeSendErrorResponse(res, 500, '실행 시간 초과 처리 중 오류가 발생했습니다.');
+                await performCleanup();
+                safeSendErrorResponse(res, 500, ERROR_MESSAGES.EXECUTION_TIMEOUT_HANDLING_ERROR);
             }
         }
     }, config.timeout + CONFIG.TIMEOUT_BUFFER_MS);
 
     const cleanupTimeout = (): void => {
-        clearTimeout(abortTimeoutId);
-        clearTimeout(processTimeoutId);
+        if (abortTimeoutId) {
+            clearTimeout(abortTimeoutId);
+            abortTimeoutId = null;
+        }
+        if (processTimeoutId) {
+            clearTimeout(processTimeoutId);
+            processTimeoutId = null;
+        }
     };
     dockerProcess.once('close', cleanupTimeout);
     dockerProcess.once('error', cleanupTimeout);
@@ -235,4 +301,3 @@ async function cleanupResources(fullCodePath: string | null, fullInputPath: stri
     }
     await Promise.allSettled(cleanupPromises);
 }
-

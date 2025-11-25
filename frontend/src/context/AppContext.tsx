@@ -24,9 +24,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         () => parseInt(localStorage.getItem('fontSize') || String(CONFIG.DEFAULT_FONT_SIZE), 10)
     );
     const [code, setCode] = useState<string>(() => {
-        const saved = localStorage.getItem(`code_${CONFIG.DEFAULT_LANGUAGE}`);
         const template = LANGUAGE_CONFIG.templates[CONFIG.DEFAULT_LANGUAGE] || '';
-        return (saved && saved.trim().length > 0) ? saved : template;
+        return template;
     });
     const [input, setInput] = useState<string>('');
     const [output, setOutput] = useState<Output>('');
@@ -59,12 +58,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         localStorage.setItem('fontSize', fontSize.toString());
     }, [fontSize]);
 
-    useEffect(() => {
-        if (code && code.trim()) {
-            localStorage.setItem(`code_${currentLanguage}`, code);
-        }
-    }, [code, currentLanguage]);
-
     const changeLanguage = useCallback((lang: Language) => {
         if (lang && ['ko', 'en'].includes(lang)) {
             setCurrentLang(lang);
@@ -75,10 +68,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         if (!lang || !LANGUAGE_CONFIG.templates[lang]) {
             return;
         }
-        const savedCode = localStorage.getItem(`code_${lang}`);
         const template = LANGUAGE_CONFIG.templates[lang];
-        const newCode = (savedCode && savedCode.trim().length > 0) ? savedCode : template;
-        setCode(newCode);
+        setCode(template);
         setCurrentLanguage(lang);
         setOutput('');
         setError('');

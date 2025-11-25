@@ -3,7 +3,9 @@ import { WarmupConfig, WarmupResult, DockerCommandError } from '../types';
 import { runDockerCommand } from './dockerClient';
 import { checkImageExists } from './dockerImage';
 import { kotlinCompilerExistsOnHost } from '../utils/pathUtils';
+import { createLogger } from '../utils/logger';
 
+const logger = createLogger('DockerWarmup');
 const warmupStatusCache = new Map<string, { warmed: boolean; timestamp: number }>();
 const WARMUP_STATUS_TTL = 30 * 60 * 1000;
 const warmupInProgress = new Set<string>();
@@ -68,70 +70,70 @@ export function getWarmupConfigs(kotlinCacheDir: string): Omit<WarmupConfig, 'al
             image: getImage('python'),
             command: 'python -V',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.python || 10000
+            timeout: WARMUP_TIMEOUTS.python
         },
         {
             language: 'javascript',
             image: getImage('javascript'),
             command: 'node -v',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.javascript || 10000
+            timeout: WARMUP_TIMEOUTS.javascript
         },
         {
             language: 'c',
             image: getImage('c'),
             command: 'gcc --version',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.c || 10000
+            timeout: WARMUP_TIMEOUTS.c
         },
         {
             language: 'cpp',
             image: getImage('cpp'),
             command: 'g++ --version',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.cpp || 10000
+            timeout: WARMUP_TIMEOUTS.cpp
         },
         {
             language: 'java',
             image: getImage('java'),
             command: 'java -version',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.java || 10000
+            timeout: WARMUP_TIMEOUTS.java
         },
         {
             language: 'rust',
             image: getImage('rust'),
             command: 'rustc --version',
             tmpfsSize: TMPFS_SIZES.rust,
-            timeout: WARMUP_TIMEOUTS.rust || 10000
+            timeout: WARMUP_TIMEOUTS.rust
         },
         {
             language: 'php',
             image: getImage('php'),
             command: 'php -v',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.php || 8000
+            timeout: WARMUP_TIMEOUTS.php
         },
         {
             language: 'r',
             image: getImage('r'),
             command: 'Rscript --version',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.r || 10000
+            timeout: WARMUP_TIMEOUTS.r
         },
         {
             language: 'ruby',
             image: getImage('ruby'),
             command: 'ruby -v',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.ruby || 8000
+            timeout: WARMUP_TIMEOUTS.ruby
         },
         {
             language: 'csharp',
             image: getImage('csharp'),
             command: 'dotnet --version',
             tmpfsSize: TMPFS_SIZES.csharp,
-            timeout: WARMUP_TIMEOUTS.csharp || 8000
+            timeout: WARMUP_TIMEOUTS.csharp
         },
         {
             language: 'kotlin',
@@ -140,49 +142,49 @@ export function getWarmupConfigs(kotlinCacheDir: string): Omit<WarmupConfig, 'al
                 ? 'java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version'
                 : `if ${KOTLIN_COMPILER_CHECK}; then ${KOTLIN_DOWNLOAD_CMD}; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version`,
             tmpfsSize: TMPFS_SIZES.kotlin,
-            timeout: WARMUP_TIMEOUTS.kotlin || 12000
+            timeout: WARMUP_TIMEOUTS.kotlin
         },
         {
             language: 'go',
             image: getImage('go'),
             command: 'go version',
             tmpfsSize: TMPFS_SIZES.go || TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.go || 10000
+            timeout: WARMUP_TIMEOUTS.go
         },
         {
             language: 'typescript',
             image: getImage('typescript'),
             command: 'node -v',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.typescript || 8000
+            timeout: WARMUP_TIMEOUTS.typescript
         },
         {
             language: 'swift',
             image: getImage('swift'),
             command: 'swift --version',
             tmpfsSize: TMPFS_SIZES.swift,
-            timeout: WARMUP_TIMEOUTS.swift || 12000
+            timeout: WARMUP_TIMEOUTS.swift
         },
         {
             language: 'perl',
             image: getImage('perl'),
             command: 'perl -v',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.perl || 8000
+            timeout: WARMUP_TIMEOUTS.perl
         },
         {
             language: 'haskell',
             image: getImage('haskell'),
             command: 'ghc --version',
             tmpfsSize: TMPFS_SIZES.haskell,
-            timeout: WARMUP_TIMEOUTS.haskell || 12000
+            timeout: WARMUP_TIMEOUTS.haskell
         },
         {
             language: 'bash',
             image: getImage('bash'),
             command: 'bash --version',
             tmpfsSize: TMPFS_SIZES.default,
-            timeout: WARMUP_TIMEOUTS.bash || 8000
+            timeout: WARMUP_TIMEOUTS.bash
         }
     ].filter(config => config.image);
 }
@@ -191,6 +193,7 @@ export async function warmupContainer(
     config: Omit<WarmupConfig, 'allowNetwork'>,
     kotlinCacheDir?: string
 ): Promise<WarmupResult> {
+    let currentTimeout = config.timeout;
     try {
         let retries = 3;
         let imageExists = false;
@@ -214,25 +217,55 @@ export async function warmupContainer(
         }
 
         const allowNetwork = config.language === 'kotlin';
-        const result = await runDockerCommand(
-            config.image,
-            config.command,
-            config.tmpfsSize,
-            config.timeout,
-            allowNetwork,
-            kotlinCacheDir
-        );
+        let attempt = 1;
+        const maxAttempts = 3;
 
-        if (
-            config.language === 'kotlin' &&
-            result.stderr &&
-            result.stderr.includes('kotlinc-jvm')
-        ) {
-            return { success: true, language: config.language, elapsed: result.elapsed };
+        while (attempt <= maxAttempts) {
+            try {
+                const result = await runDockerCommand(
+                    config.image,
+                    config.command,
+                    config.tmpfsSize,
+                    currentTimeout,
+                    allowNetwork,
+                    kotlinCacheDir
+                );
+
+                if (
+                    config.language === 'kotlin' &&
+                    result.stderr &&
+                    result.stderr.includes('kotlinc-jvm')
+                ) {
+                    return { success: true, language: config.language, elapsed: result.elapsed };
+                }
+
+                markWarmedUp(config.language);
+                return { success: true, language: config.language, elapsed: result.elapsed };
+            } catch (error) {
+                const dockerError = error as DockerCommandError;
+                const errorInfo = dockerError?.error || {};
+                const errorMessage = errorInfo.message || (error as Error)?.message || 'Unknown error';
+
+                const isTimeout =
+                    (error as Error).name === 'AbortError' ||
+                    errorMessage.includes('aborted') ||
+                    errorMessage.includes('The operation was aborted') ||
+                    errorMessage.includes('ETIMEDOUT');
+
+                if (isTimeout && attempt < maxAttempts) {
+                    attempt++;
+                    const oldTimeout = currentTimeout;
+                    currentTimeout = Math.ceil(currentTimeout * 1.5);
+                    logger.warn(
+                        `Warmup timeout for ${config.language} (${oldTimeout}ms). Retrying (attempt ${attempt}/${maxAttempts}) with ${currentTimeout}ms...`
+                    );
+                    continue;
+                }
+
+                throw error;
+            }
         }
-
-        markWarmedUp(config.language);
-        return { success: true, language: config.language, elapsed: result.elapsed };
+        throw new Error('Unexpected warmup loop exit');
     } catch (error) {
         const dockerError = error as DockerCommandError;
         const errorInfo = dockerError?.error || {};
@@ -243,7 +276,7 @@ export async function warmupContainer(
             errorMessage.includes('aborted') ||
             errorMessage.includes('The operation was aborted')
         ) {
-            errorMessage = `Timeout after ${config.timeout}ms`;
+            errorMessage = `Timeout after ${currentTimeout}ms`;
         }
 
         if (
@@ -264,17 +297,15 @@ export async function warmupContainer(
             }
         }
 
-        if (CONFIG.DEBUG_MODE) {
-            console.debug(`[WARMUP][DEBUG] Failed warmup for ${config.language}`);
-            if ((errorInfo as any).cmd) {
-                console.debug('[WARMUP][DEBUG] Docker command:', (errorInfo as any).cmd);
-            }
-            if (errorInfo.stdout && errorInfo.stdout.trim()) {
-                console.debug('[WARMUP][DEBUG] Stdout:\n', errorInfo.stdout);
-            }
-            if (errorInfo.stderr && errorInfo.stderr.trim()) {
-                console.debug('[WARMUP][DEBUG] Stderr:\n', errorInfo.stderr);
-            }
+        logger.debug(`Failed warmup for ${config.language}`);
+        if ((errorInfo as any).cmd) {
+            logger.debug('Docker command:', (errorInfo as any).cmd);
+        }
+        if (errorInfo.stdout && errorInfo.stdout.trim()) {
+            logger.debug('Stdout:\n', errorInfo.stdout);
+        }
+        if (errorInfo.stderr && errorInfo.stderr.trim()) {
+            logger.debug('Stderr:\n', errorInfo.stderr);
         }
 
         return {
@@ -291,45 +322,42 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
     const { isDockerAvailable } = await import('./dockerClient');
 
     if (!(await isDockerAvailable())) {
-        console.warn('[WARMUP] Docker is not available. Skipping container warmup.');
+        logger.warn('Docker is not available. Skipping container warmup.');
         return;
     }
     const configs = getWarmupConfigs(kotlinCacheDir);
-    if (CONFIG.DEBUG_MODE) {
-        console.log(`[WARMUP] Warming up ${configs.length} containers...`);
-    }
+    logger.debug(`Warming up ${configs.length} containers... (Concurrency: ${CONFIG.WARMUP_BATCH_SIZE})`);
     const startTime = Date.now();
 
     const results: WarmupResult[] = [];
+    const executing = new Set<Promise<void>>();
+    let completedCount = 0;
 
-    for (let i = 0; i < configs.length; i += CONFIG.WARMUP_BATCH_SIZE) {
-        const batch = configs.slice(i, i + CONFIG.WARMUP_BATCH_SIZE);
-        const batchPromises = batch.map((config) => warmupContainer(config, kotlinCacheDir));
-        const batchResults = await Promise.all(batchPromises);
-        results.push(...batchResults);
+    for (const config of configs) {
+        const p = warmupContainer(config, kotlinCacheDir).then((result) => {
+            results.push(result);
+            completedCount++;
 
-        if (CONFIG.DEBUG_MODE) {
-            const successCount = batchResults.filter((r) => r.success).length;
-            const failCount = batchResults.filter((r) => !r.success).length;
-            const succeededLanguages = batchResults.filter((r) => r.success).map((r) => r.language);
-            const failedLanguages = batchResults.filter((r) => !r.success).map((r) => r.language);
-            const batchNumber = Math.floor(i / CONFIG.WARMUP_BATCH_SIZE) + 1;
-
-            if (successCount > 0 && failCount > 0) {
-                console.log(`[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded`);
-                console.log(`[WARMUP]   Succeeded: ${succeededLanguages.join(', ')}`);
-                console.log(`[WARMUP]   Failed: ${failedLanguages.join(', ')}`);
-            } else if (successCount > 0) {
-                console.log(
-                    `[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${succeededLanguages.join(', ')})`
-                );
+            if (result.success) {
+                logger.debug(`[${completedCount}/${configs.length}] Warmed up: ${result.language} (${result.elapsed}ms)`);
             } else {
-                console.log(
-                    `[WARMUP] Batch ${batchNumber}: ${successCount}/${batch.length} succeeded (${failedLanguages.join(', ')})`
-                );
+                const errorMsg = result.error || 'Unknown error';
+                const displayMsg = errorMsg.length > 50 ? errorMsg.substring(0, 50) + '...' : errorMsg;
+                logger.debug(`[${completedCount}/${configs.length}] Failed: ${result.language} - ${displayMsg}`);
             }
+        });
+
+        executing.add(p);
+
+        const clean = () => executing.delete(p);
+        p.then(clean).catch(clean);
+
+        if (executing.size >= CONFIG.WARMUP_BATCH_SIZE) {
+            await Promise.race(executing);
         }
     }
+
+    await Promise.all(executing);
 
     const totalSuccess = results.filter((r) => r.success).length;
     const totalFailed = results.filter((r) => !r.success).length;
@@ -338,7 +366,7 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
     if (totalFailed > 0) {
         const failedResults = results.filter((r) => !r.success);
         const failedLanguages = failedResults.map((r) => r.language);
-        console.warn(`[WARMUP] Failed for ${totalFailed} languages: ${failedLanguages.join(', ')}`);
+        logger.warn(`Failed for ${totalFailed} languages: ${failedLanguages.join(', ')}`);
 
         failedResults.forEach((result) => {
             const errorMsg = result.error || 'Unknown error';
@@ -346,7 +374,7 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
                 errorMsg.length > CONFIG.ERROR_MESSAGE_MAX_LENGTH
                     ? errorMsg.substring(0, CONFIG.ERROR_MESSAGE_MAX_LENGTH) + '...'
                     : errorMsg;
-            console.warn(`[WARMUP]   ${result.language}: ${displayMsg}`);
+            logger.warn(`  ${result.language}: ${displayMsg}`);
         });
     }
 
@@ -354,23 +382,19 @@ export async function warmupAllContainers(kotlinCacheDir: string): Promise<void>
         const avgElapsed =
             results.filter((r) => r.success).reduce((sum, r) => sum + (r.elapsed || 0), 0) /
             totalSuccess;
-        if (CONFIG.DEBUG_MODE) {
-            console.log(
-                `[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded (avg: ${avgElapsed.toFixed(0)}ms)`
-            );
-        }
+        logger.debug(
+            `Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded (avg: ${avgElapsed.toFixed(0)}ms)`
+        );
     } else {
-        if (CONFIG.DEBUG_MODE) {
-            console.log(
-                `[WARMUP] Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded`
-            );
-        }
+        logger.debug(
+            `Completed in ${elapsed}s: ${totalSuccess}/${configs.length} succeeded`
+        );
     }
 }
 
 export function warmupContainers(kotlinCacheDir: string): void {
     warmupAllContainers(kotlinCacheDir).catch((error) => {
-        console.error('Initial warmup error:', error);
+        logger.error('Initial warmup error:', error);
     });
 
     const frequentLanguages = ['python', 'javascript', 'java', 'cpp'];
@@ -387,7 +411,7 @@ export function warmupContainers(kotlinCacheDir: string): void {
         const randomConfigs = frequentConfigs.sort(() => Math.random() - 0.5).slice(0, 2);
         randomConfigs.forEach((config) => {
             warmupContainer(config, kotlinCacheDir).catch((error) => {
-                console.debug(`Warmup failed for ${config.language}:`, error);
+                logger.debug(`Warmup failed for ${config.language}:`, error);
             });
         });
     }, 60000);
@@ -400,7 +424,7 @@ export async function warmupKotlinOnStart(kotlinCacheDir: string): Promise<void>
     const image = 'eclipse-temurin:17-jdk-alpine';
     const cmd = `if ${KOTLIN_COMPILER_CHECK}; then ${KOTLIN_DOWNLOAD_CMD}; fi; java -jar /opt/kotlin/kotlinc/lib/kotlin-compiler.jar -version`;
     try {
-        await runDockerCommand(image, cmd, TMPFS_SIZES.kotlin, 20000, true, kotlinCacheDir);
+        await runDockerCommand(image, cmd, TMPFS_SIZES.kotlin, WARMUP_TIMEOUTS.kotlin || 20000, true, kotlinCacheDir);
     } catch {
     }
 }

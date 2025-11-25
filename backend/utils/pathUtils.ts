@@ -1,60 +1,75 @@
 import path from 'path';
 import * as fss from 'fs';
 
-export function normalizePath(filePath: unknown): string | null {
-    if (typeof filePath !== 'string' || !filePath.trim()) {
-        return null;
-    }
-    try {
-        const trimmed = filePath.trim();
-        if (trimmed.startsWith('/')) {
-            return trimmed.replace(/\/+/g, '/');
+export const PathUtils = {
+    normalizePath(filePath: unknown): string | null {
+        if (typeof filePath !== 'string' || !filePath.trim()) {
+            return null;
         }
-        return path.normalize(trimmed);
-    } catch {
-        return null;
-    }
-}
+        try {
+            const trimmed = filePath.trim();
+            if (trimmed.startsWith('/')) {
+                return trimmed.replace(/\/+/g, '/');
+            }
+            return path.normalize(trimmed);
+        } catch {
+            return null;
+        }
+    },
 
-export function validatePath(filePath: unknown): boolean {
-    const normalized = normalizePath(filePath);
-    if (!normalized) {
-        return false;
-    }
-    if (normalized.includes('\0')) {
-        return false;
-    }
-    if (normalized.startsWith('/')) {
-        return !normalized.includes('..');
-    }
-    try {
-        const resolved = path.resolve(normalized);
-        return resolved === normalized || resolved.startsWith(normalized);
-    } catch {
-        return false;
-    }
-}
+    validatePath(filePath: unknown): boolean {
+        const normalized = PathUtils.normalizePath(filePath);
+        if (!normalized) {
+            return false;
+        }
+        if (normalized.includes('\0')) {
+            return false;
+        }
+        if (normalized.startsWith('/')) {
+            return !normalized.includes('..');
+        }
+        try {
+            const resolved = path.resolve(normalized);
+            return resolved === normalized || resolved.startsWith(normalized);
+        } catch {
+            return false;
+        }
+    },
 
-export function convertToDockerPath(filePath: string): string {
-    const normalized = normalizePath(filePath);
-    if (!normalized) {
-        throw new Error('Invalid file path');
-    }
-    if (process.platform === 'win32' && normalized.match(/^[A-Z]:/)) {
-        const drive = normalized[0].toLowerCase();
-        const rest = normalized.substring(2).replace(/\\/g, '/');
-        return `/${drive}${rest}`;
-    }
-    return normalized.replace(/\\/g, '/');
-}
+    isChildPath(childPath: unknown, parentPath: string): boolean {
+        const normalizedChild = PathUtils.normalizePath(childPath);
+        if (!normalizedChild) {
+            return false;
+        }
+        const normalizedParent = path.resolve(parentPath);
 
-export function getContainerCodePath(language: string, extension: string, containerCodePaths: Record<string, string>): string {
-    return containerCodePaths[language] || `/tmp/code${extension}`;
-}
+        const parentDir = process.platform === 'win32' ? normalizedParent.replace(/\\/g, '/') : normalizedParent;
+        const childDir = process.platform === 'win32' ? normalizedChild.replace(/\\/g, '/') : normalizedChild;
 
-export function validateDockerPath(dockerPath: string): boolean {
-    return !!(dockerPath && dockerPath.length > 0 && dockerPath[0] === '/');
-}
+        return childDir.startsWith(parentDir);
+    },
+
+    convertToDockerPath(filePath: string): string {
+        const normalized = PathUtils.normalizePath(filePath);
+        if (!normalized) {
+            throw new Error('Invalid file path');
+        }
+        if (process.platform === 'win32' && normalized.match(/^[A-Z]:/)) {
+            const drive = normalized[0].toLowerCase();
+            const rest = normalized.substring(2).replace(/\\/g, '/');
+            return `/${drive}${rest}`;
+        }
+        return normalized.replace(/\\/g, '/');
+    },
+
+    getContainerCodePath(language: string, extension: string, containerCodePaths: Record<string, string>): string {
+        return containerCodePaths[language] || `/tmp/code${extension}`;
+    },
+
+    validateDockerPath(dockerPath: string): boolean {
+        return !!(dockerPath && dockerPath.length > 0 && dockerPath[0] === '/');
+    }
+};
 
 let kotlinCompilerPathCache: { exists: boolean; timestamp: number } | null = null;
 const KOTLIN_CACHE_TTL = 60 * 1000;
@@ -75,3 +90,9 @@ export function kotlinCompilerExistsOnHost(kotlinCacheDir: string): boolean {
     }
 }
 
+export const normalizePath = PathUtils.normalizePath;
+export const validatePath = PathUtils.validatePath;
+export const isChildPath = PathUtils.isChildPath;
+export const convertToDockerPath = PathUtils.convertToDockerPath;
+export const getContainerCodePath = PathUtils.getContainerCodePath;
+export const validateDockerPath = PathUtils.validateDockerPath;

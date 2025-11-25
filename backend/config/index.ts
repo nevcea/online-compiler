@@ -16,7 +16,11 @@ import {
     buildHaskellCommand,
     buildBashCommand
 } from './languageCommands';
-import { parseIntegerEnv, parseBooleanEnv, validateMemorySize, validateCpuPercent } from '../utils/envValidation';
+import { Env } from '../utils/envValidation';
+import { createLogger } from '../utils/logger';
+import { WARMUP_TIMEOUT_DEFAULTS } from '../utils/constants';
+
+const logger = createLogger('Config');
 
 const MAX_EXECUTION_TIME = 10000;
 
@@ -37,6 +41,7 @@ export interface Config {
     ENABLE_PRELOAD: boolean;
     ENABLE_WARMUP: boolean;
     ENABLE_CONTAINER_POOL: boolean;
+    ENABLE_CONTAINER_POOL_DEBUG: boolean;
     TRUST_PROXY: boolean;
     DEBUG_MODE: boolean;
     TIMEOUT_BUFFER_MS: number;
@@ -53,50 +58,43 @@ export interface Config {
     CLEANUP_INTERVAL_MS: number;
     SESSION_MAX_AGE_MS: number;
     ENABLE_CACHE: boolean;
+    MAX_CONCURRENT_EXECUTIONS: number;
+    MAX_QUEUE_SIZE: number;
 }
 
 export const CONFIG: Config = {
-    PORT: parseIntegerEnv(process.env.PORT, 4000, 1, 65535),
+    PORT: Env.integer('PORT', 4000, 1, 65535),
     MAX_CODE_LENGTH: 100000,
     MAX_EXECUTION_TIME: MAX_EXECUTION_TIME,
-    MAX_MEMORY: (() => {
-        const memory = process.env.MAX_MEMORY || '256m';
-        validateMemorySize(memory);
-        return memory;
-    })(),
-    MAX_CPU_PERCENT: (() => {
-        const cpu = process.env.MAX_CPU_PERCENT || '2.0';
-        validateCpuPercent(cpu);
-        return cpu;
-    })(),
-    MAX_CPU_PERCENT_KOTLIN: (() => {
-        const cpu = process.env.MAX_CPU_PERCENT_KOTLIN || '3.0';
-        validateCpuPercent(cpu);
-        return cpu;
-    })(),
-    MAX_OUTPUT_BYTES: parseIntegerEnv(process.env.MAX_OUTPUT_BYTES, 1048576, 1024, 100 * 1024 * 1024),
-    MAX_INPUT_LENGTH: parseIntegerEnv(process.env.MAX_INPUT_LENGTH, 1000000, 1, 10 * 1000000),
-    ENABLE_PRELOAD: parseBooleanEnv(process.env.ENABLE_PRELOAD, true),
-    ENABLE_WARMUP: parseBooleanEnv(process.env.ENABLE_WARMUP, true),
-    ENABLE_CONTAINER_POOL: parseBooleanEnv(process.env.ENABLE_CONTAINER_POOL, false),
-    TRUST_PROXY: parseBooleanEnv(process.env.TRUST_PROXY, false),
+    MAX_MEMORY: Env.memory('MAX_MEMORY', '256m'),
+    MAX_CPU_PERCENT: Env.cpu('MAX_CPU_PERCENT', '2.0'),
+    MAX_CPU_PERCENT_KOTLIN: Env.cpu('MAX_CPU_PERCENT_KOTLIN', '3.0'),
+    MAX_OUTPUT_BYTES: Env.integer('MAX_OUTPUT_BYTES', 1048576, 1024, 100 * 1024 * 1024),
+    MAX_INPUT_LENGTH: Env.integer('MAX_INPUT_LENGTH', 1000000, 1, 10 * 1000000),
+    ENABLE_PRELOAD: Env.boolean('ENABLE_PRELOAD', true),
+    ENABLE_WARMUP: Env.boolean('ENABLE_WARMUP', true),
+    ENABLE_CONTAINER_POOL: Env.boolean('ENABLE_CONTAINER_POOL', true),
+    ENABLE_CONTAINER_POOL_DEBUG: Env.boolean('ENABLE_CONTAINER_POOL_DEBUG', false),
+    TRUST_PROXY: Env.boolean('TRUST_PROXY', false),
     DEBUG_MODE: process.env.DEBUG
-        ? parseBooleanEnv(process.env.DEBUG, false)
+        ? Env.boolean('DEBUG', false)
         : false,
-    TIMEOUT_BUFFER_MS: parseIntegerEnv(process.env.TIMEOUT_BUFFER_MS, 2000, 0, 60000),
-    SIGKILL_DELAY_MS: parseIntegerEnv(process.env.SIGKILL_DELAY_MS, 2000, 0, 60000),
-    MAX_BUFFER_SIZE: parseIntegerEnv(process.env.MAX_BUFFER_SIZE, 2 * 1024 * 1024, 1024, 100 * 1024 * 1024),
-    DOCKER_CHECK_TIMEOUT: parseIntegerEnv(process.env.DOCKER_CHECK_TIMEOUT, 3000, 1000, 60000),
-    DOCKER_PULL_TIMEOUT: parseIntegerEnv(process.env.DOCKER_PULL_TIMEOUT, 300000, 10000, 1800000),
-    DOCKER_PULL_RETRIES: parseIntegerEnv(process.env.DOCKER_PULL_RETRIES, 2, 0, 10),
-    DOCKER_PULL_RETRY_DELAY_BASE: parseIntegerEnv(process.env.DOCKER_PULL_RETRY_DELAY_BASE, 2000, 100, 60000),
-    PRELOAD_BATCH_SIZE: parseIntegerEnv(process.env.PRELOAD_BATCH_SIZE, 3, 1, 20),
-    WARMUP_BATCH_SIZE: parseIntegerEnv(process.env.WARMUP_BATCH_SIZE, 10, 1, 50),
-    ERROR_MESSAGE_MAX_LENGTH: parseIntegerEnv(process.env.ERROR_MESSAGE_MAX_LENGTH, 200, 50, 10000),
-    ENABLE_CLEANUP: parseBooleanEnv(process.env.ENABLE_CLEANUP, true),
-    CLEANUP_INTERVAL_MS: parseIntegerEnv(process.env.CLEANUP_INTERVAL_MS, 60 * 60 * 1000, 5 * 60 * 1000, 24 * 60 * 60 * 1000),
-    SESSION_MAX_AGE_MS: parseIntegerEnv(process.env.SESSION_MAX_AGE_MS, 24 * 60 * 60 * 1000, 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000),
-    ENABLE_CACHE: parseBooleanEnv(process.env.ENABLE_CACHE, true)
+    TIMEOUT_BUFFER_MS: Env.integer('TIMEOUT_BUFFER_MS', 2000, 0, 60000),
+    SIGKILL_DELAY_MS: Env.integer('SIGKILL_DELAY_MS', 2000, 0, 60000),
+    MAX_BUFFER_SIZE: Env.integer('MAX_BUFFER_SIZE', 2 * 1024 * 1024, 1024, 100 * 1024 * 1024),
+    DOCKER_CHECK_TIMEOUT: Env.integer('DOCKER_CHECK_TIMEOUT', 3000, 1000, 60000),
+    DOCKER_PULL_TIMEOUT: Env.integer('DOCKER_PULL_TIMEOUT', 300000, 10000, 1800000),
+    DOCKER_PULL_RETRIES: Env.integer('DOCKER_PULL_RETRIES', 2, 0, 10),
+    DOCKER_PULL_RETRY_DELAY_BASE: Env.integer('DOCKER_PULL_RETRY_DELAY_BASE', 2000, 100, 60000),
+    PRELOAD_BATCH_SIZE: Env.integer('PRELOAD_BATCH_SIZE', 3, 1, 20),
+    WARMUP_BATCH_SIZE: Env.integer('WARMUP_BATCH_SIZE', 10, 1, 50),
+    ERROR_MESSAGE_MAX_LENGTH: Env.integer('ERROR_MESSAGE_MAX_LENGTH', 200, 50, 10000),
+    ENABLE_CLEANUP: Env.boolean('ENABLE_CLEANUP', true),
+    CLEANUP_INTERVAL_MS: Env.integer('CLEANUP_INTERVAL_MS', 60 * 60 * 1000, 5 * 60 * 1000, 24 * 60 * 60 * 1000),
+    SESSION_MAX_AGE_MS: Env.integer('SESSION_MAX_AGE_MS', 24 * 60 * 60 * 1000, 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000),
+    ENABLE_CACHE: Env.boolean('ENABLE_CACHE', true),
+    MAX_CONCURRENT_EXECUTIONS: Env.integer('MAX_CONCURRENT_EXECUTIONS', 5, 1, 50),
+    MAX_QUEUE_SIZE: Env.integer('MAX_QUEUE_SIZE', 50, 10, 500)
 };
 
 export function validateConfig(): void {
@@ -120,41 +118,62 @@ export function validateConfig(): void {
     }
 }
 
+const WARMUP_TIMEOUT_DEFAULT = Env.integer('WARMUP_TIMEOUT_DEFAULT', WARMUP_TIMEOUT_DEFAULTS.DEFAULT, 1000, 300000);
+
 const DEFAULT_WARMUP_TIMEOUTS: Record<string, number> = {
-    python: 10000,
-    javascript: 10000,
-    c: 10000,
-    cpp: 10000,
-    java: 10000,
-    rust: 10000,
-    php: 8000,
-    r: 10000,
-    ruby: 8000,
-    csharp: 8000,
-    kotlin: 12000,
-    go: 10000,
-    typescript: 8000,
-    swift: 12000,
-    perl: 8000,
-    haskell: 12000,
-    bash: 8000
+    python: WARMUP_TIMEOUT_DEFAULT,
+    javascript: WARMUP_TIMEOUT_DEFAULT,
+    c: WARMUP_TIMEOUT_DEFAULT,
+    cpp: WARMUP_TIMEOUT_DEFAULT,
+    java: WARMUP_TIMEOUT_DEFAULT,
+    rust: WARMUP_TIMEOUT_DEFAULT,
+    php: WARMUP_TIMEOUT_DEFAULTS.PHP,
+    r: WARMUP_TIMEOUT_DEFAULT,
+    ruby: WARMUP_TIMEOUT_DEFAULTS.RUBY,
+    csharp: WARMUP_TIMEOUT_DEFAULTS.CSHARP,
+    kotlin: WARMUP_TIMEOUT_DEFAULTS.KOTLIN,
+    go: WARMUP_TIMEOUT_DEFAULT,
+    typescript: WARMUP_TIMEOUT_DEFAULTS.TYPESCRIPT,
+    swift: WARMUP_TIMEOUT_DEFAULTS.SWIFT,
+    perl: WARMUP_TIMEOUT_DEFAULTS.PERL,
+    haskell: WARMUP_TIMEOUT_DEFAULTS.HASKELL,
+    bash: WARMUP_TIMEOUT_DEFAULTS.BASH
 };
 
 export const WARMUP_TIMEOUTS: Record<string, number> = (() => {
-    const env = process.env.WARMUP_TIMEOUTS;
-    if (!env) {
-        return DEFAULT_WARMUP_TIMEOUTS;
-    }
-    try {
-        const parsed = JSON.parse(env);
-        if (typeof parsed === 'object' && parsed !== null) {
-            return { ...DEFAULT_WARMUP_TIMEOUTS, ...parsed };
+    const timeouts = { ...DEFAULT_WARMUP_TIMEOUTS };
+
+    if (process.env.WARMUP_TIMEOUT_DEFAULT) {
+        for (const key in timeouts) {
+            if (Object.prototype.hasOwnProperty.call(timeouts, key)) {
+                timeouts[key] = WARMUP_TIMEOUT_DEFAULT;
+            }
         }
-        return DEFAULT_WARMUP_TIMEOUTS;
-    } catch {
-        console.warn('Invalid WARMUP_TIMEOUTS env var, using defaults');
-        return DEFAULT_WARMUP_TIMEOUTS;
     }
+
+    const envJson = process.env.WARMUP_TIMEOUTS;
+    if (envJson) {
+        try {
+            const parsed = JSON.parse(envJson);
+            if (typeof parsed === 'object' && parsed !== null) {
+                Object.assign(timeouts, parsed);
+            }
+        } catch {
+            logger.warn('Invalid WARMUP_TIMEOUTS env var, using defaults');
+        }
+    }
+
+    for (const key in timeouts) {
+        if (Object.prototype.hasOwnProperty.call(timeouts, key)) {
+            const envVarName = `WARMUP_TIMEOUT_${key.toUpperCase()}`;
+            const val = Env.integer(envVarName, 0, 0, 300000);
+            if (val > 0) {
+                timeouts[key] = val;
+            }
+        }
+    }
+
+    return timeouts;
 })();
 
 const DEFAULT_TMPFS_SIZES: Record<string, string> = {
@@ -179,7 +198,7 @@ export const TMPFS_SIZES: Record<string, string> = (() => {
         }
         return DEFAULT_TMPFS_SIZES;
     } catch {
-        console.warn('Invalid TMPFS_SIZES env var, using defaults');
+        logger.warn('Invalid TMPFS_SIZES env var, using defaults');
         return DEFAULT_TMPFS_SIZES;
     }
 })();
@@ -215,7 +234,7 @@ export const CPU_LIMITS: Record<string, string> = (() => {
         }
         return DEFAULT_CPU_LIMITS;
     } catch {
-        console.warn('Invalid CPU_LIMITS env var, using defaults');
+        logger.warn('Invalid CPU_LIMITS env var, using defaults');
         return DEFAULT_CPU_LIMITS;
     }
 })();
@@ -252,7 +271,7 @@ export const EXECUTION_TIMEOUTS: Record<string, number> = (() => {
         }
         return DEFAULT_EXECUTION_TIMEOUTS;
     } catch {
-        console.warn('Invalid EXECUTION_TIMEOUTS env var, using defaults');
+        logger.warn('Invalid EXECUTION_TIMEOUTS env var, using defaults');
         return DEFAULT_EXECUTION_TIMEOUTS;
     }
 })();

@@ -1,5 +1,8 @@
 import { CONFIG } from '../config';
 import { cleanupOldSessions, CleanupStats } from './resourceCleanup';
+import { createLogger } from './logger';
+
+const logger = createLogger('CleanupScheduler');
 
 export interface CleanupScheduler {
     start(): void;
@@ -25,17 +28,15 @@ class CleanupSchedulerImpl implements CleanupScheduler {
         }
 
         this.isActive = true;
-        if (CONFIG.DEBUG_MODE) {
-            console.log(`[CLEANUP] Starting cleanup scheduler (interval: ${CONFIG.CLEANUP_INTERVAL_MS}ms, max age: ${CONFIG.SESSION_MAX_AGE_MS}ms)`);
-        }
+        logger.info(`Starting cleanup scheduler (interval: ${CONFIG.CLEANUP_INTERVAL_MS}ms, max age: ${CONFIG.SESSION_MAX_AGE_MS}ms)`);
 
         this.runCleanup().catch((error) => {
-            console.error('[CLEANUP] Initial cleanup failed:', error);
+            logger.error('Initial cleanup failed:', error);
         });
 
         this.intervalId = setInterval(() => {
             this.runCleanup().catch((error) => {
-                console.error('[CLEANUP] Scheduled cleanup failed:', error);
+                logger.error('Scheduled cleanup failed:', error);
             });
         }, CONFIG.CLEANUP_INTERVAL_MS);
     }
@@ -50,7 +51,7 @@ class CleanupSchedulerImpl implements CleanupScheduler {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
-        console.log('[CLEANUP] Cleanup scheduler stopped');
+        logger.info('Cleanup scheduler stopped');
     }
 
     async runCleanup(): Promise<CleanupStats> {
@@ -68,7 +69,7 @@ class CleanupSchedulerImpl implements CleanupScheduler {
         const duration = Date.now() - startTime;
 
         if (stats.filesDeleted > 0 || stats.directoriesDeleted > 0 || stats.errors > 0) {
-            console.log(`[CLEANUP] Cleanup completed in ${duration}ms:`, {
+            logger.info(`Cleanup completed in ${duration}ms:`, {
                 filesDeleted: stats.filesDeleted,
                 directoriesDeleted: stats.directoriesDeleted,
                 bytesFreed: formatBytes(stats.bytesFreed),

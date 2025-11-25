@@ -1,8 +1,12 @@
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
-import { validateImage } from '../utils/validation';
+import { CONFIG } from '../config';
+import { Validator } from '../utils/validation';
+import { DockerArgs } from './dockerArgs';
+import { createLogger } from '../utils/logger';
 
 const execAsync = promisify(exec);
+const logger = createLogger('ContainerPool');
 
 interface PooledContainer {
     id: string;
@@ -14,12 +18,21 @@ interface PooledContainer {
 
 class ContainerPool {
     private pools: Map<string, PooledContainer[]> = new Map();
-    private maxPoolSize = 3;
-    private containerTTL = 5 * 60 * 1000;
+    private maxPoolSize = Math.max(CONFIG.MAX_CONCURRENT_EXECUTIONS * 2, 10);
+    private containerTTL = 10 * 60 * 1000; // Increased TTL
     private cleanupInterval = 60 * 1000;
 
     constructor() {
         setInterval(() => this.cleanup(), this.cleanupInterval);
+    }
+
+    async getOrCreateContainer(language: string, image: string, kotlinCacheDir?: string): Promise<string | null> {
+        const containerId = await this.getContainer(language, image);
+        if (containerId) {
+            return containerId;
+        }
+        const { args } = DockerArgs.buildPoolStartupArgs(language, kotlinCacheDir);
+        return this.createPooledContainer(language, image, args);
     }
 
     async getContainer(language: string, image: string): Promise<string | null> {
@@ -43,7 +56,7 @@ class ContainerPool {
     }
 
     async returnContainer(language: string, image: string, containerId: string): Promise<void> {
-        if (!containerId || !validateImage(image)) {
+        if (!containerId || !Validator.image(image)) {
             return;
         }
 
@@ -54,6 +67,7 @@ class ContainerPool {
             const oldest = pool.shift();
             if (oldest) {
                 this.removeContainer(oldest.id).catch(() => {
+                    logger.debug('Failed to remove oldest container', { containerId: oldest.id });
                 });
             }
         }
@@ -72,18 +86,16 @@ class ContainerPool {
                 this.pools.set(poolKey, pool);
             } catch {
                 this.removeContainer(containerId).catch(() => {
+                    logger.debug('Failed to remove container after clean failure', { containerId });
                 });
             }
         }
     }
 
     private async cleanContainer(containerId: string): Promise<void> {
-        try {
-            await execAsync(`docker exec ${containerId} sh -c "rm -rf /tmp/* /code/* /input/* /output/* 2>/dev/null || true"`, {
-                timeout: 5000
-            });
-        } catch {
-        }
+        await execAsync(`docker exec ${containerId} sh -c "rm -rf /tmp/* /code/* /input/* /output/* 2>/dev/null || true"`, {
+            timeout: 5000
+        });
     }
 
     private async isContainerRunning(containerId: string): Promise<boolean> {
@@ -105,20 +117,35 @@ class ContainerPool {
         try {
             await execAsync(`docker rm -f ${containerId} 2>/dev/null || true`, { timeout: 3000 });
         } catch {
+            logger.debug('Container removal failed (may already be removed)', { containerId });
         }
     }
 
     private async cleanup(): Promise<void> {
-        for (const [poolKey, pool] of this.pools.entries()) {
+        const cleanupPromises = Array.from(this.pools.entries()).map(async ([poolKey, pool]) => {
+            const validityChecks = await Promise.all(
+                pool.map(async (container) => ({
+                    container,
+                    isValid: this.isContainerValid(container) && await this.isContainerRunning(container.id)
+                }))
+            );
+
             const validContainers: PooledContainer[] = [];
-            for (const container of pool) {
-                if (this.isContainerValid(container) && await this.isContainerRunning(container.id)) {
+            for (const { container, isValid } of validityChecks) {
+                if (isValid) {
                     validContainers.push(container);
                 } else {
                     this.removeContainer(container.id).catch(() => {
+                        logger.debug('Failed to remove invalid container', { containerId: container.id });
                     });
                 }
             }
+
+            return { poolKey, validContainers };
+        });
+
+        const results = await Promise.all(cleanupPromises);
+        for (const { poolKey, validContainers } of results) {
             if (validContainers.length > 0) {
                 this.pools.set(poolKey, validContainers);
             } else {

@@ -1,5 +1,9 @@
 import { createHash } from 'crypto';
 import { CONFIG } from '../config';
+import { createLogger } from './logger';
+import { Env } from './envValidation';
+
+const logger = createLogger('ExecutionCache');
 
 const DEFAULT_CACHE_MAX_SIZE = 1000;
 const DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -240,9 +244,7 @@ class ExecutionCache {
 
         if (cleaned > 0) {
             this.stats.size = this.cache.size;
-            if (CONFIG.DEBUG_MODE) {
-                console.log(`[CACHE] Cleaned up ${cleaned} expired entries`);
-            }
+            logger.debug(`Cleaned up ${cleaned} expired entries`);
         }
     }
 
@@ -271,15 +273,13 @@ class ExecutionCache {
     }
 }
 
-import { parseIntegerEnv } from './envValidation';
-
 const CACHE_MAX_SIZE_MIN = 100;
 const CACHE_MAX_SIZE_MAX = 10000;
 const CACHE_TTL_MS_MIN = 60 * 1000;
 const CACHE_TTL_MS_MAX = 24 * 60 * 60 * 1000;
 
 export const executionCache = new ExecutionCache(
-    parseIntegerEnv(process.env.CACHE_MAX_SIZE, DEFAULT_CACHE_MAX_SIZE, CACHE_MAX_SIZE_MIN, CACHE_MAX_SIZE_MAX),
-    parseIntegerEnv(process.env.CACHE_TTL_MS, DEFAULT_CACHE_TTL_MS, CACHE_TTL_MS_MIN, CACHE_TTL_MS_MAX)
+    Env.integer('CACHE_MAX_SIZE', DEFAULT_CACHE_MAX_SIZE, CACHE_MAX_SIZE_MIN, CACHE_MAX_SIZE_MAX),
+    Env.integer('CACHE_TTL_MS', DEFAULT_CACHE_TTL_MS, CACHE_TTL_MS_MIN, CACHE_TTL_MS_MAX)
 );
 

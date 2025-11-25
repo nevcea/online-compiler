@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import { CONFIG } from '../config';
 import { DockerCommandResult, DockerCommandError } from '../types';
 import { convertToDockerPath } from '../utils/pathUtils';
-import { validateImage } from '../utils/validation';
+import { Validator } from '../utils/validation';
 import { createTimeoutController } from '../utils/timeout';
 
 export async function isDockerAvailable(): Promise<boolean> {
@@ -26,7 +26,7 @@ export async function runDockerCommand(
     allowNetwork: boolean = false,
     kotlinCacheDir?: string
 ): Promise<DockerCommandResult> {
-    if (!validateImage(image) || typeof command !== 'string' || typeof tmpfsSize !== 'string') {
+    if (!Validator.image(image) || typeof command !== 'string' || typeof tmpfsSize !== 'string') {
         throw new Error('Invalid parameters');
     }
     const networkFlag = allowNetwork ? [] : ['--network=none'];
@@ -42,7 +42,7 @@ export async function runDockerCommand(
     const args: string[] = ['run', '--rm', `--memory=${tmpfsSize}`, `--cpus=${CONFIG.MAX_CPU_PERCENT}`, ...networkFlag, '--read-only', '--tmpfs', `/tmp:rw,exec,nosuid,size=${tmpfsSize}`, ...mounts, image, 'sh', '-c', command];
 
     const dockerCmdStr = ['docker', ...args].join(' ');
-    const { controller, clear } = createTimeoutController(timeout);
+    const { controller, clear } = createTimeoutController(timeout + 500);
     const startTime = Date.now();
 
     try {

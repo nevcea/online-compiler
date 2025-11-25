@@ -4,7 +4,10 @@ import crypto from 'crypto';
 import { validatePath } from '../utils/validation';
 import { getContainerCodePath } from '../utils/pathUtils';
 import { ImageFile } from '../types';
-import { CONFIG } from '../config';
+import { createLogger } from '../utils/logger';
+import { IMAGE_EXTENSIONS, MIME_TYPE_MAP, ERROR_MESSAGES } from '../utils/constants';
+
+const logger = createLogger('FileManager');
 
 export async function cleanupFile(filePath: string | null): Promise<void> {
     if (!filePath || !validatePath(filePath)) {
@@ -12,21 +15,19 @@ export async function cleanupFile(filePath: string | null): Promise<void> {
     }
     try {
         await fs.unlink(filePath).catch((error: unknown) => {
-            if (CONFIG?.DEBUG_MODE && error instanceof Error && !error.message.includes('ENOENT')) {
-                console.warn(`[CLEANUP] Failed to delete file ${filePath}:`, error);
+            if (error instanceof Error && !error.message.includes('ENOENT')) {
+                logger.debug(`Failed to delete file ${filePath}:`, error);
             }
         });
     } catch (error) {
-        if (CONFIG?.DEBUG_MODE) {
-            console.error('[CLEANUP] Cleanup error:', error);
-        }
+        logger.debug('Cleanup error:', error);
     }
 }
 
 export async function writeInputFile(inputPath: string, inputText: string): Promise<string> {
     if (!validatePath(inputPath)) {
-        console.error('[ERROR] Invalid input path:', inputPath);
-        throw new Error('입력 파일 경로가 올바르지 않습니다.');
+        logger.error('Invalid input path:', inputPath);
+        throw new Error(ERROR_MESSAGES.INVALID_INPUT_PATH);
     }
     const resolvedInputPath = path.resolve(inputPath);
     await fs.writeFile(resolvedInputPath, inputText, 'utf8');
@@ -41,8 +42,8 @@ export async function writeCodeFile(
     languageExtensions: Record<string, string>
 ): Promise<string> {
     if (!validatePath(codePath)) {
-        console.error('[ERROR] Invalid code path:', codePath);
-        throw new Error('코드 경로가 올바르지 않습니다.');
+        logger.error('Invalid code path:', codePath);
+        throw new Error(ERROR_MESSAGES.INVALID_CODE_PATH);
     }
     const resolvedCodePath = path.resolve(codePath);
     await fs.writeFile(resolvedCodePath, code, 'utf8');
@@ -55,8 +56,8 @@ export async function writeCodeFile(
         if (classMatch) {
             const className = classMatch[1];
             if (expectedFileName !== `${className}${extension}`) {
-                console.error('[ERROR] Class name mismatch:', className, expectedFileName);
-                throw new Error(`클래스 이름 ${className}은 파일 이름 ${expectedFileName}과 일치해야 합니다.`);
+                logger.error(`Class name mismatch: ${className} vs ${expectedFileName}`);
+                throw new Error(ERROR_MESSAGES.CLASS_NAME_MISMATCH(className, expectedFileName));
             }
         }
     }
@@ -65,47 +66,46 @@ export async function writeCodeFile(
 }
 
 export async function findImageFiles(outputDir: string): Promise<ImageFile[]> {
-    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.bmp', '.webp'];
-    const mimeTypeMap: Record<string, string> = {
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.svg': 'image/svg+xml',
-        '.bmp': 'image/bmp',
-        '.webp': 'image/webp'
-    };
-    const images: ImageFile[] = [];
-
     try {
         const files = await fs.readdir(outputDir);
-        for (const file of files) {
-            const ext = path.extname(file).toLowerCase();
-            if (imageExtensions.includes(ext)) {
+
+        // Process all image files in parallel
+        const imagePromises = files
+            .filter(file => {
+                const ext = path.extname(file).toLowerCase();
+                return IMAGE_EXTENSIONS.includes(ext as any);
+            })
+            .map(async (file) => {
+                const ext = path.extname(file).toLowerCase();
                 const filePath = path.join(outputDir, file);
                 try {
                     const imageBuffer = await fs.readFile(filePath);
                     const base64 = imageBuffer.toString('base64');
-                    const mimeType = mimeTypeMap[ext] || `image/${ext.slice(1)}`;
-                    images.push({
-                        name: file,
-                        data: `data:${mimeType};base64,${base64}`
-                    });
-                    await fs.unlink(filePath).catch((error: unknown) => {
-                        if (CONFIG.DEBUG_MODE && error instanceof Error) {
-                            console.warn(`[CLEANUP] Failed to delete image file ${filePath}:`, error);
+                    const mimeType = MIME_TYPE_MAP[ext] || `image/${ext.slice(1)}`;
+
+                    // Delete file asynchronously (don't wait)
+                    fs.unlink(filePath).catch((error: unknown) => {
+                        if (error instanceof Error) {
+                            logger.debug(`Failed to delete image file ${filePath}:`, error);
                         }
                     });
-                } catch (error) {
-                    console.error(`[ERROR] Failed to read image file ${file}:`, error);
-                }
-            }
-        }
-    } catch (error) {
-        console.error('[ERROR] Failed to read output directory:', error);
-    }
 
-    return images;
+                    return {
+                        name: file,
+                        data: `data:${mimeType};base64,${base64}`
+                    };
+                } catch (error) {
+                    logger.error(`Failed to read image file ${file}:`, error);
+                    return null;
+                }
+            });
+
+        const results = await Promise.all(imagePromises);
+        return results.filter((img): img is ImageFile => img !== null);
+    } catch (error) {
+        logger.error('Failed to read output directory:', error);
+        return [];
+    }
 }
 
 export async function ensureDirectories(

@@ -2,7 +2,9 @@ import { Registry, Counter, Histogram, Gauge, collectDefaultMetrics } from 'prom
 import { executionQueue } from '../execution/executionQueue';
 import { executionCache } from './cache';
 import { getResourceStats } from './resourceMonitor';
+import { createLogger } from './logger';
 
+const logger = createLogger('Metrics');
 const register = new Registry();
 
 collectDefaultMetrics({ register });
@@ -134,7 +136,7 @@ export function startMetricsCollection(): void {
                 diskFileCount.set({ directory: 'output', type: 'directories' }, resourceStats.disk.outputDir.directories);
             }
         } catch (error) {
-            console.error('[METRICS] Error updating metrics:', error);
+            logger.error('Error updating metrics:', error);
         }
     }, 5000);
 }

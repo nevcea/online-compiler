@@ -5,6 +5,9 @@ import { createCleanupScheduler } from '../utils/cleanupScheduler';
 import { setResourceMonitorPaths } from '../utils/resourceMonitor';
 import { executionCache } from '../utils/cache';
 import { startMetricsCollection, stopMetricsCollection } from '../utils/metrics';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ServerInit');
 
 export interface ServerPaths {
     codeDir: string;
@@ -15,9 +18,15 @@ export interface ServerPaths {
 }
 
 export function getServerPaths(): ServerPaths {
-    const codeDir = path.join(__dirname, '..', 'code');
-    const outputDir = path.join(__dirname, '..', 'output');
-    const toolCacheDir = path.join(__dirname, '..', 'tool_cache');
+    const codeDir = process.env.CODE_DIR || (process.env.NODE_ENV === 'production'
+        ? '/app/code'
+        : path.join(__dirname, '..', 'code'));
+    const outputDir = process.env.OUTPUT_DIR || (process.env.NODE_ENV === 'production'
+        ? '/app/output'
+        : path.join(__dirname, '..', 'output'));
+    const toolCacheDir = process.env.TOOL_CACHE_DIR || (process.env.NODE_ENV === 'production'
+        ? '/app/tool_cache'
+        : path.join(__dirname, '..', 'tool_cache'));
     const kotlinCacheDir = path.join(toolCacheDir, 'kotlin');
     const kotlinBuildsDir = path.join(toolCacheDir, 'kotlin_builds');
 
@@ -31,7 +40,7 @@ export function getServerPaths(): ServerPaths {
 }
 
 export async function initializeServer(paths: ServerPaths): Promise<void> {
-    console.log('[SERVER] Ensuring required directories...', {
+    logger.info('Ensuring required directories...', {
         codeDir: paths.codeDir,
         outputDir: paths.outputDir,
         toolCacheDir: paths.toolCacheDir
@@ -45,9 +54,7 @@ export async function initializeServer(paths: ServerPaths): Promise<void> {
         paths.kotlinBuildsDir
     );
 
-    console.log('[SERVER] Directories ready. Starting Kotlin warmup (if needed)...');
     await warmupKotlinOnStart(paths.kotlinCacheDir);
-    console.log('[SERVER] Kotlin warmup finished.');
 
     setResourceMonitorPaths(paths.codeDir, paths.outputDir);
 
@@ -57,7 +64,7 @@ export async function initializeServer(paths: ServerPaths): Promise<void> {
     startMetricsCollection();
 
     const shutdown = (signal: string) => {
-        console.log(`[SERVER] ${signal} received, shutting down gracefully...`);
+        logger.info(`${signal} received, shutting down gracefully...`);
         cleanupScheduler.stop();
         executionCache.stop();
         stopMetricsCollection();

@@ -1,7 +1,6 @@
-import { memo, useState, useEffect, useRef, useMemo } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Output } from '../../types';
-import { formatExecutionTime } from '../../utils/outputFormatter';
 import Modal from '../Modal';
 import './styles.css';
 
@@ -13,7 +12,7 @@ interface OutputPanelProps {
 }
 
 const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) => {
-    const { t, setOutput, executionTime, isRunning } = useApp();
+    const { t, setOutput, isRunning } = useApp();
     const [pendingClearOutput, setPendingClearOutput] = useState(false);
     const outputContentRef = useRef<HTMLDivElement>(null);
     const consoleOutputRef = useRef<HTMLDivElement>(null);
@@ -35,8 +34,6 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
     const images = typeof output === 'object' && 'images' in output ? output.images : [];
     const hasContent = outputText || error || images.length > 0;
 
-    const formattedExecutionTime = useMemo(() => formatExecutionTime(executionTime), [executionTime]);
-
     useEffect(() => {
         if (!isRunning && hasContent && consoleOutputRef.current) {
             const timer = setTimeout(() => {
@@ -55,15 +52,6 @@ const OutputPanel = memo(({ input, setInput, output, error }: OutputPanelProps) 
                 <div className="output-title">
                     <div className="output-title-content">
                         {t('execution-result')}
-                        {formattedExecutionTime && !isRunning && (
-                            <span className="execution-time" title={t('execution-time')}>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.25rem' }}>
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                                {formattedExecutionTime}
-                            </span>
-                        )}
                     </div>
                 </div>
                 {hasContent && (

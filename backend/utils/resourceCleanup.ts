@@ -1,6 +1,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { CONFIG } from '../config';
+import { createLogger } from './logger';
+
+const logger = createLogger('ResourceCleanup');
 
 export interface CleanupStats {
     filesDeleted: number;
@@ -52,15 +54,11 @@ export async function cleanupOldFiles(
                 }
             } catch (error) {
                 stats.errors++;
-                if (CONFIG.DEBUG_MODE) {
-                    console.warn(`[CLEANUP] Failed to process ${filePath}:`, error);
-                }
+                logger.debug(`Failed to process ${filePath}:`, error);
             }
         }
     } catch (error) {
-        if (CONFIG.DEBUG_MODE) {
-            console.warn(`[CLEANUP] Failed to read directory ${dirPath}:`, error);
-        }
+        logger.debug(`Failed to read directory ${dirPath}:`, error);
         stats.errors++;
     }
 
