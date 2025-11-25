@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/useApp';
 import { LANGUAGE_CONFIG } from '../../config/constants';
 import type { ProgrammingLanguage } from '../../types';

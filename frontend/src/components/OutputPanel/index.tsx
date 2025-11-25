@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useRef, useMemo } from 'react';
+import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Output } from '../../types';
 import { formatExecutionTime } from '../../utils/outputFormatter';

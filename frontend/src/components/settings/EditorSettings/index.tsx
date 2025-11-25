@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../../context/useApp';
 import { FONT_CONFIG } from '../../../config/constants';
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, memo, useCallback } from 'react';
+import { useEffect, useRef, memo, useCallback } from 'react';
 import AceEditor from 'react-ace';
 import { useApp } from '../../context/useApp';
 import { LANGUAGE_CONFIG } from '../../config/constants';

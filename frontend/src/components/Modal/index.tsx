@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useApp } from '../../context/useApp';
 import './styles.css';
 

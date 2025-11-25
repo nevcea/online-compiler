@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../../context/useApp';
 import type { ToastType } from '../../types';
 import './styles.css';

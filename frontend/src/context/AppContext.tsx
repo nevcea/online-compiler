@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { CONFIG, LANGUAGE_CONFIG } from '../config/constants';
 import { getTranslation, type TranslationKey } from '../i18n/translations';
 import type { AppContextType, Language, ProgrammingLanguage, Theme, ToastType, Output } from '../types';
