@@ -136,6 +136,12 @@ export default [
     },
     {
         files: ['frontend/src/**/*.{ts,tsx}'],
+        ignores: [
+            'frontend/src/**/*.test.{ts,tsx}',
+            'frontend/src/**/__tests__/**',
+            'frontend/src/**/__benchmarks__/**',
+            'frontend/src/vite-env.d.ts'
+        ],
         languageOptions: {
             parser: tsparser,
             parserOptions: {
@@ -151,6 +157,29 @@ export default [
         rules: {
             'no-undef': 'off',
             '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }]
+        }
+    },
+    {
+        files: [
+            'frontend/src/**/*.test.{ts,tsx}',
+            'frontend/src/**/__tests__/**',
+            'frontend/src/**/__benchmarks__/**',
+            'frontend/src/vite-env.d.ts'
+        ],
+        languageOptions: {
+            parser: tsparser,
+            parserOptions: {
+                ecmaVersion: 'latest',
+                ecmaFeatures: { jsx: true },
+                sourceType: 'module'
+            }
+        },
+        plugins: {
+            '@typescript-eslint': tseslint
+        },
+        rules: {
+            'no-undef': 'off',
+            '@typescript-eslint/no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }]
         }
     },
     {

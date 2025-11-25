@@ -31,7 +31,7 @@ export function extractErrorMessage(error: unknown, t: (key: TranslationKey) => 
     if (httpMatch) {
         const status = parseInt(httpMatch[1], 10);
         const errorDetail = httpMatch[2];
-        
+
         let statusKey: TranslationKey;
         if (status === 400) {
             statusKey = 'bad-request';
@@ -40,7 +40,7 @@ export function extractErrorMessage(error: unknown, t: (key: TranslationKey) => 
         } else {
             statusKey = 'request-error';
         }
-        
+
         if (errorDetail && errorDetail !== `HTTP ${status} error`) {
             return `${t(statusKey)}: ${errorDetail}`;
         }

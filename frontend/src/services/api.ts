@@ -32,7 +32,7 @@ const makeRequest = async (
         if (!response.ok) {
             const status = response.status;
             let errorMessage = '';
-            
+
             try {
                 const errorData = await response.json();
                 if (errorData.error) {
@@ -41,9 +41,9 @@ const makeRequest = async (
             } catch (e) {
                 console.debug('Failed to parse error response:', e);
             }
-            
+
             const shouldRetry = RETRYABLE_STATUS_CODES.includes(status) && attempt < MAX_RETRIES;
-            
+
             if (shouldRetry) {
                 const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
                 await sleep(delay);
@@ -76,32 +76,32 @@ const makeRequest = async (
             if (error.name === 'AbortError') {
                 throw new Error('TRANSLATION_KEY:request-timeout-retry');
             }
-            
-            const isNetworkError = error.message.includes('Failed to fetch') || 
+
+            const isNetworkError = error.message.includes('Failed to fetch') ||
                                  error.message.includes('NetworkError') ||
                                  error.message.includes('Network request failed');
-            
+
             if (isNetworkError && attempt < MAX_RETRIES) {
                 const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
                 await sleep(delay);
                 return makeRequest(code, language, input, attempt + 1);
             }
-            
+
             if (isNetworkError) {
                 throw new Error('TRANSLATION_KEY:network-error-detail');
             }
-            
+
             if (error.message.includes('HTTP')) {
                 throw error;
             }
-            
+
             if (error.message.includes('TRANSLATION_KEY:')) {
                 throw error;
             }
-            
+
             throw new Error(`TRANSLATION_KEY:request-error:${error.message}`);
         }
-        
+
         throw new Error('TRANSLATION_KEY:unexpected-error');
     }
 };
