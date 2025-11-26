@@ -142,6 +142,7 @@ describe('Error Handler Middleware', () => {
             );
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '%s',
                 expect.stringContaining('Internal server error:'),
                 '\n',
                 expect.objectContaining({
