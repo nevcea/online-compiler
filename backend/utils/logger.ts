@@ -39,52 +39,44 @@ class Logger {
         return `${COLORS.dim}[${timestamp}]${COLORS.reset} ${levelColor}[${level.padEnd(5).trim()}]${COLORS.reset} ${contextColor}[${this.context}]${COLORS.reset} ${message}`;
     }
 
-    /**
-     * 디버그 로그: CONFIG.DEBUG_MODE가 true일 때만 출력됩니다.
-     * 객체나 메타데이터를 함께 전달하면 보기 좋게 포맷팅하여 출력합니다.
-     */
     debug(message: string, meta?: any): void {
         if (!isDebugMode()) {
-            return; // Early return to avoid unnecessary work
+            return;
         }
         const formattedMessage = this.formatMessage('DEBUG', message);
         if (meta !== undefined) {
-            console.log(formattedMessage, '\n', COLORS.gray + JSON.stringify(meta, null, 2) + COLORS.reset);
+            console.log('%s', formattedMessage, '\n', COLORS.gray + JSON.stringify(meta, null, 2) + COLORS.reset);
         } else {
-            console.log(formattedMessage);
+            console.log('%s', formattedMessage);
         }
     }
 
     info(message: string, meta?: any): void {
         const formattedMessage = this.formatMessage('INFO', message);
         if (meta !== undefined) {
-            console.log(formattedMessage, '\n', JSON.stringify(meta, null, 2));
+            console.log('%s', formattedMessage, '\n', JSON.stringify(meta, null, 2));
         } else {
-            console.log(formattedMessage);
+            console.log('%s', formattedMessage);
         }
     }
 
     warn(message: string, meta?: any): void {
         const formattedMessage = this.formatMessage('WARN', message);
         if (meta !== undefined) {
-            console.warn(formattedMessage, '\n', COLORS.yellow + JSON.stringify(meta, null, 2) + COLORS.reset);
+            console.warn('%s', formattedMessage, '\n', COLORS.yellow + JSON.stringify(meta, null, 2) + COLORS.reset);
         } else {
-            console.warn(formattedMessage);
+            console.warn('%s', formattedMessage);
         }
     }
 
     error(message: string, error?: unknown): void {
         const formattedMessage = this.formatMessage('ERROR', message);
         if (error) {
-            console.error(formattedMessage, '\n', error);
+            console.error('%s', formattedMessage, '\n', error);
         } else {
-            console.error(formattedMessage);
+            console.error('%s', formattedMessage);
         }
     }
 }
 
-/**
- * 각 모듈에서 사용할 로거 인스턴스를 생성합니다.
- * 예: const logger = createLogger('ExecutionService');
- */
 export const createLogger = (context: string) => new Logger(context);
