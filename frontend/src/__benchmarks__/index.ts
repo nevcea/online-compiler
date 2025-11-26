@@ -152,7 +152,7 @@ async function runTranslationBenchmarks(): Promise<BenchmarkResult[]> {
                 getTranslation('title', 'ko');
                 getTranslation('run', 'ko');
                 getTranslation('clear', 'ko');
-                getTranslation('execution-time', 'ko');
+                getTranslation('settings', 'ko');
             },
             10000
         )
@@ -165,7 +165,7 @@ async function runTranslationBenchmarks(): Promise<BenchmarkResult[]> {
                 getTranslation('title', 'en');
                 getTranslation('run', 'en');
                 getTranslation('clear', 'en');
-                getTranslation('execution-time', 'en');
+                getTranslation('settings', 'en');
             },
             10000
         )
