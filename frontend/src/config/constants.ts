@@ -1,5 +1,5 @@
 export const CONFIG = {
-    API_URL: import.meta.env.VITE_API_URL || '',
+    API_URL: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_URL || '' : '',
     DEFAULT_LANGUAGE: 'python' as const,
     DEFAULT_THEME: 'system' as const,
     DEFAULT_FONT_FAMILY: "'Consolas', 'Monaco', 'Courier New', monospace",
